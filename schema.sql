@@ -15,6 +15,10 @@ CREATE TABLE IF NOT EXISTS pois (
                     CHECK (status IN ('Buka', 'Antre', 'Penuh')),  -- owned by backend (ADR-014)
     is_popular  boolean NOT NULL DEFAULT false,
     synonyms    text[] NOT NULL DEFAULT '{}',   -- mirrors POIData.sinonim, aids search
+    -- Display-only detail content for the WebView detail sheet — owned by backend
+    -- (ADR-014), never consumed by Unity.
+    description text NOT NULL DEFAULT '',
+    photos      text[] NOT NULL DEFAULT '{}',   -- image URLs; empty = UI renders placeholder
     created_at  timestamptz NOT NULL DEFAULT now(),
     updated_at  timestamptz NOT NULL DEFAULT now()
 );

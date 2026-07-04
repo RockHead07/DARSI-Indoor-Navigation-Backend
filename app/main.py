@@ -29,7 +29,7 @@ from psycopg.rows import dict_row
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
 # Fields exposed to the WebView. NOTE: no "distance" — ADR-007.
-POI_COLUMNS = "name, category, building, floor, status, is_popular"
+POI_COLUMNS = "name, category, building, floor, status, is_popular, description, photos"
 
 
 @asynccontextmanager
