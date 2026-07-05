@@ -10,10 +10,11 @@ threadpool, which is plenty for a low-traffic read-only API and sidesteps the
 Windows async-event-loop gotcha (psycopg async needs SelectorEventLoop, uvicorn
 defaults to ProactorEventLoop on Windows). ponytail: no async where sync is fine.
 
-Endpoints (all read-only, no auth):
-  GET /api/poi/popular
-  GET /api/poi/search?q=&category=
-  GET /api/poi/categories
+Endpoints:
+  GET  /api/poi/popular              (read-only, no auth)
+  GET  /api/poi/search?q=&category=  (read-only, no auth)
+  GET  /api/poi/categories           (read-only, no auth)
+  POST /api/poi/sync                 (admin token, T3.4-L2 — Unity Editor push)
 
 No response ever includes a distance/meter field — deliberate (ADR-007).
 """
@@ -21,12 +22,14 @@ No response ever includes a distance/meter field — deliberate (ADR-007).
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from psycopg_pool import ConnectionPool
 from psycopg.rows import dict_row
+from pydantic import BaseModel
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
+POI_SYNC_TOKEN = os.environ.get("POI_SYNC_TOKEN", "")
 
 # Fields exposed to the WebView. NOTE: no "distance" — ADR-007.
 POI_COLUMNS = "name, category, building, floor, status, is_popular, description, photos"
@@ -94,6 +97,59 @@ def categories():
     """Distinct categories for the Cari Lokasi filter chips."""
     rows = _fetch("SELECT DISTINCT category FROM pois ORDER BY category")
     return [r["category"] for r in rows]
+
+
+class PoiSyncEntry(BaseModel):
+    id: str  # Unity POIData.poiId (GUID) — stable key, never the display name
+    name: str
+    category: str
+    building: str = ""
+    floor: str = ""
+    synonyms: list[str] = []
+
+
+class PoiSyncPayload(BaseModel):
+    pois: list[PoiSyncEntry]
+
+
+@app.post("/api/poi/sync")
+def sync_pois(payload: PoiSyncPayload, x_admin_token: str = Header(default="")):
+    """Unity Editor push (T3.4-L2): upsert static fields only, keyed by unity_id.
+
+    Never touches `status` — that stays backend-owned (ADR-014). First sync of a
+    POI created before the sync tool existed adopts the pre-seeded row by matching
+    on `name`, then backfills unity_id so future renames still resolve correctly.
+    """
+    if not POI_SYNC_TOKEN or x_admin_token != POI_SYNC_TOKEN:
+        raise HTTPException(status_code=401, detail="invalid or missing admin token")
+
+    created = updated = 0
+    with app.state.pool.connection() as conn:
+        with conn.cursor() as cur:
+            for poi in payload.pois:
+                cur.execute("SELECT id FROM pois WHERE unity_id = %s", (poi.id,))
+                row = cur.fetchone()
+                if row is None:
+                    cur.execute("SELECT id FROM pois WHERE name = %s", (poi.name,))
+                    row = cur.fetchone()
+
+                if row is None:
+                    cur.execute(
+                        """INSERT INTO pois (unity_id, name, category, building, floor, synonyms)
+                           VALUES (%s, %s, %s, %s, %s, %s)""",
+                        (poi.id, poi.name, poi.category, poi.building, poi.floor, poi.synonyms),
+                    )
+                    created += 1
+                else:
+                    cur.execute(
+                        """UPDATE pois SET unity_id = %s, name = %s, category = %s,
+                                            building = %s, floor = %s, synonyms = %s
+                           WHERE id = %s""",
+                        (poi.id, poi.name, poi.category, poi.building, poi.floor, poi.synonyms, row["id"]),
+                    )
+                    updated += 1
+
+    return {"synced": created + updated, "created": created, "updated": updated}
 
 
 @app.get("/health")

@@ -4,6 +4,10 @@
 
 CREATE TABLE IF NOT EXISTS pois (
     id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    -- Stable key pushed from Unity POIData.poiId (GUID, T3.4-L1/L2). NULL for rows
+    -- that predate the sync tool; first sync adopts them by matching on `name`
+    -- (see POST /api/poi/sync in app/main.py) and backfills this column.
+    unity_id    text UNIQUE,
     -- name doubles as the poiId sent to Unity for now (exact-match resolution,
     -- see ROADMAP T1.4). Unique so it can act as the stable key until POIData
     -- gains a real id field (ADR-014 phasing / T3.4-L1).
