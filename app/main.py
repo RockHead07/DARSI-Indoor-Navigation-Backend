@@ -34,6 +34,24 @@ POI_SYNC_TOKEN = os.environ.get("POI_SYNC_TOKEN", "")
 # Fields exposed to the WebView. NOTE: no "distance" — ADR-007.
 POI_COLUMNS = "name, category, building, floor, status, is_popular, description, photos"
 
+# Kategori POI kanonik — SATU sumber kebenaran. Sync (Unity push) ditolak kalau ada
+# kategori di luar daftar ini, jadi typo ketahuan saat klik Sync (fail-loud di boundary),
+# bukan diam-diam jadi ikon default di WebView. HARUS sama persis (case-sensitive) dengan
+# key categoryIcon() di WebView (app/lib/api.ts) — kalau nambah kategori, update dua-duanya.
+POI_CATEGORIES = frozenset({
+    # Klinis / instalasi medis
+    "IGD", "Poliklinik", "Farmasi", "Laboratorium", "Radiologi",
+    "Rawat Inap", "Kamar Operasi", "ICU", "Ruang Bersalin", "Fisioterapi",
+    # Administrasi / layanan
+    "Pendaftaran", "Kasir", "Informasi", "BPJS", "Rekam Medis",
+    # Fasilitas umum
+    "Musholla", "Toilet", "Kantin", "ATM", "Parkir", "Ruang Tunggu",
+    # Sirkulasi / wayfinding
+    "Lift", "Tangga", "Pintu Masuk",
+    # Kategori demo kampus (lama) — masih dipakai seed 11 POI
+    "Umum", "Administrasi",
+})
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -131,6 +149,17 @@ def sync_pois(payload: PoiSyncPayload, x_admin_token: str = Header(default="")):
     """
     if not POI_SYNC_TOKEN or x_admin_token != POI_SYNC_TOKEN:
         raise HTTPException(status_code=401, detail="invalid or missing admin token")
+
+    # Fail-loud di boundary: tolak seluruh sync kalau ada kategori tak dikenal, sebutkan
+    # POI mana biar bisa langsung dibetulkan di Unity. All-or-nothing sengaja — jangan
+    # sebagian ke-upsert lalu sebagian gagal (bikin state DB setengah jadi).
+    unknown = sorted({poi.category for poi in payload.pois} - POI_CATEGORIES)
+    if unknown:
+        raise HTTPException(
+            status_code=422,
+            detail=f"kategori tidak dikenal: {', '.join(unknown)}. "
+                   f"Kategori valid: {', '.join(sorted(POI_CATEGORIES))}",
+        )
 
     created = updated = 0
     with app.state.pool.connection() as conn:
