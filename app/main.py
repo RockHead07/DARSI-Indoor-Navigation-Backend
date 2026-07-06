@@ -38,7 +38,16 @@ POI_COLUMNS = "name, category, building, floor, status, is_popular, description,
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # sync ConnectionPool managed from an async lifespan (open/close are plain sync calls)
-    app.state.pool = ConnectionPool(DATABASE_URL, open=False, kwargs={"row_factory": dict_row})
+    # check=check_connection: verify a pooled connection is alive before handing it
+    # out. Without this, a connection Railway's proxy silently dropped while idle
+    # (e.g. no requests for a while) gets reused and fails with
+    # "SSL error: unexpected eof while reading" instead of being replaced.
+    app.state.pool = ConnectionPool(
+        DATABASE_URL,
+        open=False,
+        kwargs={"row_factory": dict_row},
+        check=ConnectionPool.check_connection,
+    )
     app.state.pool.open()
     try:
         yield
