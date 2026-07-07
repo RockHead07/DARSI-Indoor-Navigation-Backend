@@ -32,7 +32,10 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "")
 POI_SYNC_TOKEN = os.environ.get("POI_SYNC_TOKEN", "")
 
 # Fields exposed to the WebView. NOTE: no "distance" — ADR-007.
-POI_COLUMNS = "name, category, building, floor, status, is_popular, description, photos"
+# unity_id (stable GUID from Unity POIData) is aliased to "id" — the WebView passes it
+# back as launchAR poiId so navigation survives a POI display-name rename. NULL for any
+# legacy row not yet synced; the WebView falls back to name in that case.
+POI_COLUMNS = "unity_id AS id, name, category, building, floor, status, is_popular, description, photos"
 
 # Kategori POI kanonik — SATU sumber kebenaran. Sync (Unity push) ditolak kalau ada
 # kategori di luar daftar ini, jadi typo ketahuan saat klik Sync (fail-loud di boundary),
