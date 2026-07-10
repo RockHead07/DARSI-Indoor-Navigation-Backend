@@ -84,7 +84,7 @@ app = FastAPI(title="DARSI POI API", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET"],
+    allow_methods=["GET", "PUT"],
     allow_headers=["*"],
 )
 
@@ -191,6 +191,32 @@ def sync_pois(payload: PoiSyncPayload, x_admin_token: str = Header(default="")):
                     updated += 1
 
     return {"synced": created + updated, "created": created, "updated": updated}
+
+
+class PresencePayload(BaseModel):
+    invisible: bool
+
+
+@app.get("/api/presence/{user_id}")
+def get_presence(user_id: str):
+    """'Tampil offline' state (ADR-013 opt-out) — not the friend graph, see schema.sql."""
+    rows = _fetch("SELECT invisible FROM presence WHERE user_id = %s", (user_id,))
+    return {"invisible": rows[0]["invisible"] if rows else False}
+
+
+@app.put("/api/presence/{user_id}")
+def set_presence(user_id: str, payload: PresencePayload):
+    # ponytail: user_id trusted from the URL, no auth layer yet — matches the
+    # rest of the API pre-identity-integration (ADR-017); add a real auth check
+    # once MyRSIy issues verifiable tokens.
+    with app.state.pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """INSERT INTO presence (user_id, invisible) VALUES (%s, %s)
+                   ON CONFLICT (user_id) DO UPDATE SET invisible = %s, updated_at = now()""",
+                (user_id, payload.invisible, payload.invisible),
+            )
+    return {"invisible": payload.invisible}
 
 
 @app.get("/health")

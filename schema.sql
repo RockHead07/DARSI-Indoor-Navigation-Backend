@@ -47,3 +47,13 @@ CREATE TRIGGER trg_pois_updated_at
 -- NOTE: no `distance`/`meter` column anywhere — that is a deliberate product
 -- decision (ADR-007), not an omission. Distance is computed inside Unity after
 -- localize, never served by the API.
+
+-- Presence opt-out only (ADR-013 "tampil offline"). NOT the friend graph — that
+-- (friends/requests tables) waits on stable identity from MyRSIy (ROADMAP T0.8),
+-- per the Sprint 1 decision to cancel "Backend Fase 2" as unrealistic this sprint.
+-- This table is scoped to just the one toggle already live in the WebView UI.
+CREATE TABLE IF NOT EXISTS presence (
+    user_id     text PRIMARY KEY,  -- window.__DARSI_USER__.userId (ADR-017), client-trusted for now
+    invisible   boolean NOT NULL DEFAULT false,
+    updated_at  timestamptz NOT NULL DEFAULT now()
+);
