@@ -79,11 +79,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="DARSI POI API", lifespan=lifespan)
 
 # WebView is served from a different origin (Next.js), so allow it to fetch.
-# ponytail: wide-open CORS is fine for a read-only public POI API; tighten to the
-# real WebView origin when it is known.
+# Default "*" is for local dev only — since PUT /api/presence exists (a write),
+# production MUST set CORS_ORIGINS to the real WebView origin(s), comma-separated,
+# or any website in the user's browser can flip presence flags cross-site.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
     allow_methods=["GET", "PUT"],
     allow_headers=["*"],
 )

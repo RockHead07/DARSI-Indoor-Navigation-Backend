@@ -27,6 +27,12 @@ CREATE TABLE IF NOT EXISTS pois (
     updated_at  timestamptz NOT NULL DEFAULT now()
 );
 
+-- Migrasi untuk DB yang tabelnya sudah ada: CREATE TABLE IF NOT EXISTS di atas
+-- diam-diam skip tabel lama, jadi kolom yang ditambah belakangan TIDAK ikut
+-- (unity_id sempat hilang di DB lokal karena ini). Baris ALTER idempoten di bawah
+-- memastikan "jalankan ulang schema.sql" selalu = skema terkini, di DB manapun.
+ALTER TABLE pois ADD COLUMN IF NOT EXISTS unity_id text UNIQUE;
+
 -- Search helpers
 CREATE INDEX IF NOT EXISTS idx_pois_category ON pois (category);
 CREATE INDEX IF NOT EXISTS idx_pois_name_lower ON pois (lower(name));
