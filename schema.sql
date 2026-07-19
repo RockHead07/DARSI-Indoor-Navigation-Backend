@@ -4,14 +4,12 @@
 
 CREATE TABLE IF NOT EXISTS pois (
     id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    -- Stable key pushed from Unity POIData.poiId (GUID, T3.4-L1/L2). NULL for rows
-    -- that predate the sync tool; first sync adopts them by matching on `name`
-    -- (see POST /api/poi/sync in app/main.py) and backfills this column.
-    unity_id    text UNIQUE,
-    -- name doubles as the poiId sent to Unity for now (exact-match resolution,
-    -- see ROADMAP T1.4). Unique so it can act as the stable key until POIData
-    -- gains a real id field (ADR-014 phasing / T3.4-L1).
-    name        text NOT NULL UNIQUE,
+    -- SATU-SATUNYA kunci identitas POI: POIData.poiId (GUID) dari Unity (T3.4-L1/L2).
+    unity_id    text NOT NULL UNIQUE,
+    -- Atribut TAMPILAN, bukan kunci — sengaja tidak unik (ADR-021). Satu gedung sah
+    -- punya banyak "Lift"/"Toilet"/"Tangga", satu per lantai. Untuk membedakannya di
+    -- UI, susun dari name + floor saat render — JANGAN jejalkan lantai ke dalam name.
+    name        text NOT NULL,
     category    text NOT NULL,
     building    text,                 -- owned by Unity/POIData (ADR-014)
     floor       text,                 -- owned by Unity/POIData (ADR-014)
@@ -32,6 +30,24 @@ CREATE TABLE IF NOT EXISTS pois (
 -- (unity_id sempat hilang di DB lokal karena ini). Baris ALTER idempoten di bawah
 -- memastikan "jalankan ulang schema.sql" selalu = skema terkini, di DB manapun.
 ALTER TABLE pois ADD COLUMN IF NOT EXISTS unity_id text UNIQUE;
+
+-- ADR-021 (2026-07-19). Urutan tiga baris di bawah penting: buang constraint dulu,
+-- baru bersihkan baris legacy, baru kunci NOT NULL.
+--
+-- 1. `name` UNIQUE adalah warisan masa sebelum POIData punya id sendiri. Data RSI asli
+--    mematahkannya (dua "Lift", satu per lantai) — gejalanya 500 UniqueViolation saat sync.
+ALTER TABLE pois DROP CONSTRAINT IF EXISTS pois_name_key;
+
+-- 2. Buang sisa scene kampus (Perpustakaan, Lab Teori 202, Ruang Dosen, BAAK, ...).
+--    unity_id hanya NULL kalau baris tidak pernah lewat POST /api/poi/sync, dan satu-
+--    satunya jalur non-sync adalah seed.sql yang isinya kampus semua. Baris kampus yang
+--    sudah diadopsi sync sebelumnya sudah punya unity_id, jadi TIDAK ikut terhapus.
+--    RETURNING supaya yang hilang kelihatan, bukan menghapus dalam gelap.
+DELETE FROM pois WHERE unity_id IS NULL RETURNING name;
+
+-- 3. unity_id kini satu-satunya kunci sah — ini yang menggantikan perlindungan duplikat
+--    yang tadinya (keliru) dipegang name UNIQUE.
+ALTER TABLE pois ALTER COLUMN unity_id SET NOT NULL;
 
 -- Search helpers
 CREATE INDEX IF NOT EXISTS idx_pois_category ON pois (category);

@@ -51,7 +51,7 @@ POI_CATEGORIES = frozenset({
     "Musholla", "Toilet", "Kantin", "ATM", "Parkir", "Ruang Tunggu",
     # Sirkulasi / wayfinding
     "Lift", "Tangga", "Pintu Masuk",
-    # Kategori demo kampus (lama) — masih dipakai seed 11 POI
+    # Umum/lain-lain — masih terpakai di scene RSI ([Ground] Ground = Umum)
     "Umum", "Administrasi",
 })
 
@@ -147,9 +147,9 @@ class PoiSyncPayload(BaseModel):
 def sync_pois(payload: PoiSyncPayload, x_admin_token: str = Header(default="")):
     """Unity Editor push (T3.4-L2): upsert static fields only, keyed by unity_id.
 
-    Never touches `status` — that stays backend-owned (ADR-014). First sync of a
-    POI created before the sync tool existed adopts the pre-seeded row by matching
-    on `name`, then backfills unity_id so future renames still resolve correctly.
+    Never touches `status` — that stays backend-owned (ADR-014). Pencocokan murni
+    lewat unity_id: `name` cuma atribut tampilan dan sengaja TIDAK unik (ADR-021),
+    jadi rename POI di Unity aman dan dua "Lift" beda lantai tetap dua baris.
     """
     if not POI_SYNC_TOKEN or x_admin_token != POI_SYNC_TOKEN:
         raise HTTPException(status_code=401, detail="invalid or missing admin token")
@@ -169,11 +169,13 @@ def sync_pois(payload: PoiSyncPayload, x_admin_token: str = Header(default="")):
     with app.state.pool.connection() as conn:
         with conn.cursor() as cur:
             for poi in payload.pois:
+                # Cocokkan HANYA lewat unity_id. Fallback "adopsi baris legacy by name"
+                # dihapus (ADR-021): itu kode rekonsiliasi untuk baris pra-sync, dan baris
+                # pra-sync sudah tidak ada setelah data kampus dibersihkan. Membiarkannya
+                # hidup setelah `name` tidak lagi unik justru berbahaya — dua GUID berbeda
+                # bisa mencaplok satu baris dan satu POI hilang diam-diam.
                 cur.execute("SELECT id FROM pois WHERE unity_id = %s", (poi.id,))
                 row = cur.fetchone()
-                if row is None:
-                    cur.execute("SELECT id FROM pois WHERE name = %s", (poi.name,))
-                    row = cur.fetchone()
 
                 if row is None:
                     cur.execute(

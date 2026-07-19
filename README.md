@@ -18,7 +18,10 @@ computed inside Unity after localize, never served here.
 
 ## Files
 - `schema.sql` — `pois` table (standard SQL)
-- `seed.sql` — 11 campus POIs (names match the Unity scene exactly so navigate resolves)
+- `seed.sql` — **usang, jangan dijalankan** (ADR-021). Isinya 11 POI scene kampus lama;
+  data POI sekarang datang dari Unity lewat `POST /api/poi/sync`. File ini juga tidak lagi
+  kompatibel dengan skema: dia INSERT tanpa `unity_id` (kini NOT NULL) dan pakai
+  `ON CONFLICT (name)` (constraint-nya sudah dicabut).
 - `app/main.py` — FastAPI service (sync psycopg + sync endpoints; runs in a threadpool)
 - `requirements.txt`
 
@@ -29,7 +32,7 @@ computed inside Unity after localize, never served here.
 cp .env.example .env          # then edit DATABASE_URL
 export DATABASE_URL="postgresql://postgres:darsi@localhost:5433/darsi"
 psql "$DATABASE_URL" -f schema.sql
-psql "$DATABASE_URL" -f seed.sql
+# TIDAK ada seed — isi POI dari Unity: menu DARSI > Sync POIs to Backend
 
 # 2. API
 python -m venv .venv && . .venv/Scripts/activate   # (Windows: .venv\Scripts\activate)
@@ -39,10 +42,12 @@ uvicorn app.main:app --reload --port 8000
 ```
 
 ## Notes
-- `name` doubles as the `poiId` sent to Unity for now — exact-match resolution until
-  `POIData` gets a stable id (Unity repo ROADMAP T1.4).
-- `building`/`floor` are seeded manually here for now; they become owned by Unity/POIData
-  via the Editor sync tool (ADR-014, ROADMAP T3.4-L2). `status` stays owned by the backend.
+- `unity_id` (GUID dari `POIData.poiId`) adalah **satu-satunya** kunci identitas POI.
+  `name` cuma atribut tampilan dan sengaja tidak unik — satu gedung sah punya banyak
+  "Lift"/"Toilet", satu per lantai (ADR-021). Untuk membedakannya di UI, susun dari
+  `name` + `floor` saat render; jangan simpan lantai di dalam `name`.
+- `name`/`building`/`floor` dimiliki Unity dan dikirim lewat Editor sync tool
+  (ADR-014/ADR-021). `status`, `description`, `photos`, `is_popular` milik backend.
 - Runtime note: psycopg's async pool can't use Windows' default ProactorEventLoop, so this
   service uses the **sync** psycopg pool with sync endpoints (FastAPI runs them in a
   threadpool). Simpler and portable.
