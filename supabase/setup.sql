@@ -85,6 +85,17 @@ create policy "presence read"   on presence for select to anon using (true);
 create policy "presence insert" on presence for insert to anon with check (true);
 create policy "presence update" on presence for update to anon using (true) with check (true);
 
+-- GRANT tabel = lapisan WAJIB di bawah RLS. "Auto-expose new tables" dimatikan → Supabase
+-- tak grant otomatis, jadi lakukan manual (kalau tidak: "permission denied for table ...",
+-- baik saat baca WebView/anon maupun sync). RLS tetap yang memfilter baris.
+grant usage on schema public to anon;
+grant select on public.pois           to anon;
+grant select on public.poi_categories to anon;
+grant select, insert, update on public.presence to anon;
+-- service_role TIDAK di-grant tabel pois: satu-satunya jalannya menulis pois = lewat
+-- sync_pois (security definer di bawah). Ini mengunci batas kepemilikan kolom (ADR-014)
+-- bahkan terhadap service_role key.
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 4. RPC search_pois — satu-satunya baca yang tak bisa PostgREST murni:
 --    substring ILIKE pada elemen array `synonyms`. Bentuk balikan = kontrak ApiPoi
@@ -114,9 +125,12 @@ grant execute on function search_pois(text, text) to anon;
 --    → FK violation → seluruh transaksi batal (fail-loud, sejalan perilaku lama).
 --    Cocok HANYA lewat unity_id; `name` sengaja tak unik (ADR-021).
 -- ─────────────────────────────────────────────────────────────────────────────
+-- SECURITY DEFINER: jalan sbg OWNER fungsi (punya hak penuh atas pois) → pemanggil
+-- (service_role) cukup EXECUTE, tak perlu grant tabel. Aman karena EXECUTE dicabut dari
+-- public/anon (hanya service_role) + search_path dikunci ke public (anti-injeksi).
 create or replace function sync_pois(payload jsonb)
 returns jsonb
-language plpgsql security invoker set search_path = public
+language plpgsql security definer set search_path = public
 as $$
 declare
     rec jsonb;
