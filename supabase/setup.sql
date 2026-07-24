@@ -145,5 +145,8 @@ begin
     return jsonb_build_object('synced', created+updated, 'created', created, 'updated', updated);
 end;
 $$;
--- Browser TAK boleh panggil ini. Hanya service_role (bypass RLS, dipakai Unity Editor).
+-- Browser TAK boleh panggil ini. Hanya service_role (dipakai Unity Editor).
+-- BYPASSRLS tidak mencakup privilege EXECUTE fungsi — jadi cabut dari public/anon,
+-- lalu grant EKSPLISIT ke service_role, kalau tidak sync kena "permission denied".
 revoke all on function sync_pois(jsonb) from public, anon;
+grant execute on function sync_pois(jsonb) to service_role;
