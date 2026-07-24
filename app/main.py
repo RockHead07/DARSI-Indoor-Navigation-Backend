@@ -84,7 +84,7 @@ app = FastAPI(title="DARSI POI API", lifespan=lifespan)
 # or any website in the user's browser can flip presence flags cross-site.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
+    allow_origins=[o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()],
     allow_methods=["GET", "PUT"],
     allow_headers=["*"],
 )
