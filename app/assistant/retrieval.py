@@ -5,10 +5,17 @@ pencarian makna. Vector search di data tabular mengembalikan baris yang mirip
 bentuknya, bukan yang benar, dan jam praktek salah di RS bukan kesalahan kecil.
 """
 
+import re
+
 import psycopg
 
 from app.assistant import embedding
 from app.assistant.models import RetrievedChunk, ScheduleRow
+
+# Reciprocal Rank Fusion. Menggabung dua pencarian lewat PERINGKAT, bukan skor
+# mentah, jadi masalah "skala skor berpindah antar pertanyaan" tidak relevan lagi
+# di tahap penggabungan. k=60 nilai standar di literatur RRF.
+RRF_K = 60
 
 # ponytail: knob kalibrasi, bukan konstanta fisika. Angkanya ditetapkan lewat
 # scripts/eval_retrieval.py, bukan ditebak.
@@ -42,6 +49,17 @@ BUILDING_BONUS = 0.02
 # CASE di ORDER BY membuat index HNSW tidak terpakai dan query jadi seq scan.
 _OVERFETCH = 20
 
+# Kata fungsi/kata tanya yang tidak membawa sinyal isi. Hanya dipakai untuk menyaring
+# sisi PERTANYAAN sebelum full-text, tidak memengaruhi vector search. Sengaja pendek
+# dan konservatif: kata yang bisa jadi bagian nama layanan (mis. "cara", "jam",
+# "daftar", "buka") TIDAK dimasukkan, karena itu justru pembeda antar chunk.
+_STOPWORDS = frozenset({
+    "yang", "untuk", "dari", "dengan", "pada", "dan", "atau", "adalah", "saja",
+    "mau", "mana", "gimana", "bagaimana", "apa", "apakah", "bisa", "boleh",
+    "harus", "kalau", "jika", "saya", "aku", "kita", "itu", "ini", "tidak",
+    "ada", "juga", "sih", "dong", "nya", "punya", "dapat", "akan",
+})
+
 
 def search_chunks(
     conn: psycopg.Connection,
@@ -50,13 +68,33 @@ def search_chunks(
     building: str | None,
     limit: int = 5,
 ) -> list[RetrievedChunk]:
-    """Cari chunk prosa paling relevan. Lantai/gedung hanya mem-bias peringkat."""
+    """Cari chunk prosa paling relevan lewat gabungan vector + full-text Indonesia.
+
+    Dua pencarian dijalankan berdampingan lalu digabung dengan RRF:
+      - vector (pgvector) menangkap kemiripan MAKNA
+      - full-text 'indonesian' menangkap kecocokan KATA, terutama nama entitas
+
+    Vector saja terbukti tidak cukup. Terukur: pertanyaan "igd buka 24 jam tidak"
+    membuat model embedding menaruh chunk Musholla di peringkat 1, padahal kata
+    "igd" ada persis di pertanyaan dan di judul chunk yang benar.
+
+    Lantai/gedung hanya mem-bias peringkat vector, tidak pernah mem-filter.
+    """
     vec = embedding.embed([query])[0]
+    # Kata < 3 huruf dan kata fungsi dibuang sebelum masuk full-text. Terukur:
+    # stemmer 'indonesian' memotong "maupun" jadi "mau", sehingga kata tanya "mau"
+    # pada "mau sholat di mana" mencocoki chunk yang memuat "maupun" dan
+    # menenggelamkan jawaban yang benar. Kata fungsi tidak membawa sinyal isi.
+    terms = [
+        t for t in re.findall(r"\w+", query.lower())
+        if len(t) >= 3 and t not in _STOPWORDS
+    ]
+    tsquery = " OR ".join(terms)
 
     with conn.cursor() as cur:
         cur.execute(
-            """SELECT k.content, k.title, k.doc_type, k.poi_unity_id, p.name AS poi_name,
-                      k.floor, k.building, k.is_simulated,
+            """SELECT k.id, k.content, k.title, k.doc_type, k.poi_unity_id,
+                      p.name AS poi_name, k.floor, k.building, k.is_simulated,
                       1 - (k.embedding <=> %s::vector) AS score
                FROM knowledge_chunks k
                LEFT JOIN pois p ON p.unity_id = k.poi_unity_id
@@ -64,16 +102,74 @@ def search_chunks(
                LIMIT %s""",
             (str(vec), str(vec), _OVERFETCH),
         )
-        rows = cur.fetchall()
+        vrows = cur.fetchall()
+
+        lrows = []
+        if tsquery:
+            cur.execute(
+                """SELECT k.id, k.content, k.title, k.doc_type, k.poi_unity_id,
+                          p.name AS poi_name, k.floor, k.building, k.is_simulated,
+                          ts_rank(k.tsv, websearch_to_tsquery('indonesian', %s)) AS score
+                   FROM knowledge_chunks k
+                   LEFT JOIN pois p ON p.unity_id = k.poi_unity_id
+                   WHERE k.tsv @@ websearch_to_tsquery('indonesian', %s)
+                   ORDER BY score DESC
+                   LIMIT %s""",
+                (tsquery, tsquery, _OVERFETCH),
+            )
+            lrows = cur.fetchall()
+
+    # Bias diterapkan SEBELUM fusi, pada skor vector, supaya skalanya konsisten.
+    # Kalau ditambahkan setelah RRF, satu bonus 0.05 akan melompati puluhan
+    # peringkat sekaligus karena selisih antar-skor RRF cuma ~0.0003.
+    def _bias(r) -> float:
+        s = float(r["score"])
+        if current_floor and r["floor"] == current_floor:
+            s += FLOOR_BONUS
+        if building and r["building"] == building:
+            s += BUILDING_BONUS
+        return s
+
+    vsorted = sorted(vrows, key=_bias, reverse=True)
+
+    # Gerbang kasar saja, SENGAJA tidak diandalkan sebagai penentu relevansi.
+    #
+    # Terukur, dan ini alasannya: pertanyaan sampah "jadwal kereta ke bandung"
+    # mendapat cosine 0.348, sementara pertanyaan sah "sebelum usg boleh makan
+    # dulu ga" cuma 0.215. Sampah menang atas yang sah. Tidak ada satu ambang pun
+    # yang bisa memisahkan keduanya dengan model embedding ini.
+    #
+    # Jadi gerbang ini hanya menyaring yang benar-benar jauh (mis. "resep rendang
+    # padang" di 0.090). Keputusan relevansi yang sesungguhnya ada di LLM, yang
+    # membaca teks chunk-nya dan diperintahkan menolak kalau tidak menjawab
+    # (lihat generation._SYSTEM_PROMPT). Itu pembaca yang jauh lebih baik daripada
+    # satu angka kemiripan.
+    #
+    # Lexical TIDAK boleh membuka gerbang sendirian: satu kata kebetulan ("resep",
+    # "cara", "jadwal") langsung mematahkannya.
+    best_cosine = _bias(vsorted[0]) if vsorted else 0.0
+    if best_cosine < MIN_TOP_SCORE:
+        return []
+
+    rrf: dict[int, float] = {}
+    meta: dict[int, dict] = {}
+    for peringkat, r in enumerate(vsorted, start=1):
+        rrf[r["id"]] = rrf.get(r["id"], 0.0) + 1.0 / (RRF_K + peringkat)
+        meta[r["id"]] = r
+    for peringkat, r in enumerate(lrows, start=1):
+        rrf[r["id"]] = rrf.get(r["id"], 0.0) + 1.0 / (RRF_K + peringkat)
+        meta.setdefault(r["id"], r)
+
+    urut = sorted(rrf.items(), key=lambda kv: kv[1], reverse=True)
+    # Chunk yang muncul di KEDUA pencarian dapat skor ~2x, jadi rentang relatif ini
+    # otomatis mengutamakan yang disepakati dua-duanya.
+    batas = urut[0][1] * RELATIVE_RATIO
 
     hasil: list[RetrievedChunk] = []
-    for r in rows:
-        skor = float(r["score"])
-        # Bias, bukan filter: chunk di lantai lain tetap ikut, cuma tidak dapat bonus.
-        if current_floor and r["floor"] == current_floor:
-            skor += FLOOR_BONUS
-        if building and r["building"] == building:
-            skor += BUILDING_BONUS
+    for cid, skor in urut:
+        if skor < batas:
+            break
+        r = meta[cid]
         hasil.append(
             RetrievedChunk(
                 content=r["content"],
@@ -86,19 +182,7 @@ def search_chunks(
                 score=skor,
             )
         )
-
-    if not hasil:
-        return []
-
-    hasil.sort(key=lambda c: c.score, reverse=True)
-
-    # Tahap 1: gerbang relevansi. Chunk terbaik pun tidak cukup = tidak ada yang relevan.
-    if hasil[0].score < MIN_TOP_SCORE:
-        return []
-
-    # Tahap 2: rentang relatif terhadap peringkat 1.
-    batas = hasil[0].score * RELATIVE_RATIO
-    return [c for c in hasil if c.score >= batas][:limit]
+    return hasil[:limit]
 
 
 def find_schedules(

@@ -22,8 +22,35 @@ from psycopg.rows import dict_row
 
 from app.assistant import embedding, retrieval
 
-EVAL_PATH = Path(__file__).resolve().parent.parent / "data" / "eval_retrieval.json"
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 TOP_K = 3
+
+# Dua set, dan bedanya penting:
+#   tuning  — dipakai untuk menyetel ambang dan memperkaya corpus. Angkanya
+#             OPTIMISTIS dan tidak boleh dilaporkan sebagai kinerja sistem,
+#             karena sistemnya memang disetel terhadap set ini.
+#   holdout — soal bergaya awam yang TIDAK pernah dipakai menyetel apa pun.
+#             Inilah angka yang layak dilaporkan.
+SET_UJI = [
+    ("tuning ", DATA_DIR / "eval_retrieval.json"),
+    ("holdout", DATA_DIR / "eval_holdout.json"),
+]
+
+
+def _jalankan(conn, cases) -> tuple[int, int, list]:
+    lolos, gagal = 0, []
+    for case in cases:
+        hasil = retrieval.search_chunks(conn, case["q"], None, None, limit=TOP_K)
+        judul = [c.title for c in hasil]
+        harap = case["expect"]
+        # expect=null berarti pertanyaan di luar cakupan: hasil yang BENAR adalah
+        # kosong. Ini menguji gerbang relevansi, bukan kemampuan mencari.
+        benar = (judul == []) if harap is None else (harap in judul)
+        if benar:
+            lolos += 1
+        else:
+            gagal.append((case["q"], harap, judul))
+    return lolos, len(cases), gagal
 
 
 def main() -> int:
@@ -32,29 +59,23 @@ def main() -> int:
         print("DATABASE_URL kosong.", file=sys.stderr)
         return 1
 
-    cases = json.loads(EVAL_PATH.read_text(encoding="utf-8"))
     embedding.load_model()
+    print(f"\nMIN_TOP_SCORE={retrieval.MIN_TOP_SCORE}  "
+          f"RELATIVE_RATIO={retrieval.RELATIVE_RATIO}  "
+          f"FLOOR_BONUS={retrieval.FLOOR_BONUS}")
 
-    lolos, gagal = 0, []
     with psycopg.connect(url, row_factory=dict_row) as conn:
-        for case in cases:
-            hasil = retrieval.search_chunks(conn, case["q"], None, None, limit=TOP_K)
-            judul = [c.title for c in hasil]
-            if case["expect"] in judul:
-                lolos += 1
-            else:
-                gagal.append((case["q"], case["expect"], judul))
+        for nama, path in SET_UJI:
+            cases = json.loads(path.read_text(encoding="utf-8"))
+            lolos, total, gagal = _jalankan(conn, cases)
+            print(f"\n[{nama}] recall@{TOP_K}: {lolos}/{total} = {lolos / total:.1%}")
+            for q, expect, dapat in gagal:
+                harap = "(kosong)" if expect is None else expect
+                print(f"  - \"{q}\"\n      harusnya: {harap}\n      dapatnya: {dapat}")
 
-    total = len(cases)
-    print(f"\nrecall@{TOP_K}: {lolos}/{total} = {lolos / total:.1%}")
-    print(f"MIN_TOP_SCORE={retrieval.MIN_TOP_SCORE}  RELATIVE_RATIO={retrieval.RELATIVE_RATIO}  FLOOR_BONUS={retrieval.FLOOR_BONUS}")
-
-    if gagal:
-        print(f"\n{len(gagal)} pertanyaan meleset:")
-        for q, expect, dapat in gagal:
-            print(f"  - \"{q}\"\n      harusnya: {expect}\n      dapatnya: {dapat}")
-
-    print("\nCATATAN: angka ini diukur di atas corpus SIMULASI.")
+    print("\nCATATAN: diukur di atas corpus SIMULASI.")
+    print("Angka [tuning] optimistis (sistem disetel terhadapnya).")
+    print("Angka [holdout] yang layak dilaporkan.")
     return 0
 
 

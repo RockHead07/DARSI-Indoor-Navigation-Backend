@@ -61,3 +61,20 @@ DROP TRIGGER IF EXISTS trg_sched_updated_at ON doctor_schedules;
 CREATE TRIGGER trg_sched_updated_at
     BEFORE UPDATE ON doctor_schedules
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ── Lexical search (ditambahkan setelah pengukuran, lihat commit hybrid RRF) ──
+-- Bukti yang memicunya: kata "igd" ada PERSIS di pertanyaan dan di judul chunk,
+-- tapi model embedding gagal memberi bobot pada nama entitas. Itu justru pekerjaan
+-- sepele bagi pencarian kata kunci. Vector saja tidak cukup.
+--
+-- Konfigurasi 'indonesian' bawaan PostgreSQL (stemming + stop word Bahasa
+-- Indonesia). Judul diberi bobot 'A', isi 'B', supaya nama entitas di judul
+-- ("Alur Pasien IGD") menang atas penyebutan sambil lalu di badan teks.
+ALTER TABLE knowledge_chunks
+    ADD COLUMN IF NOT EXISTS tsv tsvector
+    GENERATED ALWAYS AS (
+        setweight(to_tsvector('indonesian', coalesce(title, '')), 'A') ||
+        setweight(to_tsvector('indonesian', coalesce(content, '')), 'B')
+    ) STORED;
+
+CREATE INDEX IF NOT EXISTS idx_chunks_tsv ON knowledge_chunks USING gin (tsv);

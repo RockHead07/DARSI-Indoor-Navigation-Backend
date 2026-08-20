@@ -156,8 +156,11 @@ CHUNKS: list[dict] = [
         "poi_unity_id": None,
         "source_ref": "corpus_simulasi.py#musholla",
         "content": (
-            "Musholla berada di Lantai 1 dekat area kantin, terbuka 24 jam, dilengkapi "
-            "tempat wudhu terpisah untuk pria dan wanita. Tersedia mukena dan sajadah."
+            "Musholla adalah tempat sholat, salat, dan ibadah bagi pasien, keluarga "
+            "pasien, maupun pengunjung. Musholla berada di Lantai 1 dekat area kantin, "
+            "terbuka 24 jam, dilengkapi tempat wudhu terpisah untuk pria dan wanita. "
+            "Tersedia mukena dan sajadah. Pengunjung bisa menunaikan sholat lima waktu "
+            "di sini, termasuk sholat Jumat."
         ),
     },
     {

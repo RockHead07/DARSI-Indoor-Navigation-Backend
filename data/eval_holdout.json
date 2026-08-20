@@ -1,0 +1,21 @@
+[
+  {"q": "bapak saya tiba tiba gak sadarkan diri", "expect": "Alur Pasien IGD"},
+  {"q": "kaki saya kena pecahan kaca berdarah", "expect": "Alur Pasien IGD"},
+  {"q": "malem malem masih dilayani ga", "expect": "Jam Operasional IGD"},
+  {"q": "nebus obat batuk dimana ya", "expect": "Layanan Farmasi"},
+  {"q": "mau di foto tulang yang patah", "expect": "Layanan Radiologi"},
+  {"q": "sebelum usg boleh makan dulu ga", "expect": "Layanan Radiologi"},
+  {"q": "periksa sampel darah kemana", "expect": "Layanan Laboratorium"},
+  {"q": "anak batuk pilek periksanya kemana", "expect": "Poli Anak"},
+  {"q": "gula darah saya tinggi konsultasi kemana", "expect": "Poli Penyakit Dalam"},
+  {"q": "pengen wudhu terus solat", "expect": "Musholla dan Fasilitas Ibadah"},
+  {"q": "jenguk pasien boleh jam berapa", "expect": "FAQ: Jam besuk pasien rawat inap"},
+  {"q": "minta fotokopi hasil periksa gimana caranya", "expect": "FAQ: Cara mendapatkan salinan rekam medis"},
+  {"q": "belum punya surat dari puskesmas boleh berobat", "expect": "FAQ: Berobat tanpa surat rujukan"},
+  {"q": "daftar pakai kartu bpjs bawa apa aja", "expect": "Alur Pendaftaran BPJS Rawat Jalan"},
+  {"q": "gak pake bpjs langsung bayar sendiri bisa", "expect": "Alur Rawat Jalan Pasien Umum"},
+
+  {"q": "jadwal kereta ke bandung", "expect": null},
+  {"q": "cara bikin sim online", "expect": null},
+  {"q": "resep rendang padang yang enak", "expect": null}
+]
