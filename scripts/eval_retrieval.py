@@ -38,7 +38,8 @@ TOP_K = 3
 SET_UJI = [
     ("tuning ", DATA_DIR / "eval_retrieval.json"),
     ("dev    ", DATA_DIR / "eval_holdout.json"),
-    ("test   ", DATA_DIR / "eval_test.json"),
+    ("test-1 ", DATA_DIR / "eval_test.json"),
+    ("test-2 ", DATA_DIR / "eval_test2.json"),
 ]
 
 
@@ -80,8 +81,9 @@ def main() -> int:
 
     print("\nCATATAN: diukur di atas corpus SIMULASI.")
     print("[tuning] dipakai menyetel ambang. Optimistis, JANGAN dilaporkan.")
-    print("[dev]    pernah dilihat kegagalannya saat memperbaiki corpus. Ikut terbakar.")
-    print("[test]   belum pernah dipakai memperbaiki apa pun. INI yang dilaporkan.")
+    print("[dev]    kegagalannya pernah dipakai memperbaiki corpus. Terbakar.")
+    print("[test-1] kegagalannya dipakai menambal 4 celah kosakata. Ikut terbakar.")
+    print("[test-2] belum pernah dipakai memperbaiki apa pun. INI yang dilaporkan.")
     return 0
 
 

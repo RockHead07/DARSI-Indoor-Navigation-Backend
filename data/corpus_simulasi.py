@@ -148,8 +148,10 @@ CHUNKS: list[dict] = [
         "poi_unity_id": None,
         "source_ref": "corpus_simulasi.py#poli_dalam",
         "content": (
-            "Poli Penyakit Dalam berada di Lantai 2, melayani konsultasi penyakit "
-            "kronis seperti diabetes, hipertensi, dan gangguan pencernaan."
+            "Poli Penyakit Dalam berada di Lantai 2, melayani konsultasi penyakit kronis "
+            "pada orang dewasa seperti diabetes atau kencing manis, hipertensi atau "
+            "tekanan darah tinggi, kolesterol tinggi, asam urat, penyakit lambung, "
+            "tipes, dan gangguan pencernaan."
         ),
     },
     {
@@ -278,7 +280,8 @@ CHUNKS: list[dict] = [
         "content": (
             "Poli Kandungan dan Kebidanan melayani pemeriksaan kehamilan, kontrol "
             "rutin ibu hamil, USG kandungan, keluhan haid, keputihan, program hamil, "
-            "dan konsultasi keluarga berencana atau KB. Ibu yang akan melahirkan "
+            "dan konsultasi keluarga berencana atau KB, termasuk pemasangan dan pelepasan "
+            "spiral atau IUD, susuk atau implan, suntik KB, dan pil KB. Ibu yang akan melahirkan "
             "ditangani di Ruang Bersalin, bukan di poli."
         ),
     },
@@ -331,7 +334,8 @@ CHUNKS: list[dict] = [
         "poi_unity_id": None,
         "source_ref": "corpus_simulasi.py#ambulans",
         "content": (
-            "Layanan ambulans tersedia 24 jam untuk menjemput pasien, rujukan antar "
+            "Layanan ambulans tersedia 24 jam. Mobil ambulans dipakai untuk menjemput "
+            "pasien dari rumah, mengantar pasien pulang, rujukan antar "
             "rumah sakit, dan mengantar jenazah. Permintaan ambulans diajukan lewat "
             "IGD atau bagian Informasi. Biaya ambulans dihitung berdasarkan jarak "
             "tempuh."
@@ -361,7 +365,8 @@ CHUNKS: list[dict] = [
         "content": (
             "Medical check up melayani pemeriksaan kesehatan berkala, syarat melamar "
             "kerja, syarat sekolah, dan syarat perjalanan. Surat keterangan sehat dan "
-            "surat keterangan sakit diterbitkan setelah pemeriksaan dokter. Pemeriksaan "
+            "surat keterangan sakit, yang juga disebut surat izin sakit atau surat izin "
+            "tidak masuk kerja dan sekolah, diterbitkan setelah pemeriksaan dokter. Pemeriksaan "
             "MCU sebaiknya dilakukan pagi hari dalam kondisi puasa."
         ),
     },
