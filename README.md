@@ -48,8 +48,22 @@ Env var tambahan: `GROQ_API_KEY` (dipanggil dari server, tidak pernah ikut ke AP
 ```bash
 python -m scripts.eval_retrieval
 ```
-Mencetak recall@3 terhadap `data/eval_retrieval.json`. Angkanya diukur di atas
-corpus simulasi, jadi mengukur mekanisme retrieval, bukan kesiapan lapangan.
+**Angka yang layak dilaporkan: recall@3 = 71,9%** pada set uji bersih 32 pertanyaan
+(78,6% untuk 28 pertanyaan dalam cakupan), di atas corpus simulasi 25 dokumen.
+
+Script mencetak **empat** set sekaligus, dan bedanya penting. Tiga set pertama
+sudah "terbakar": kegagalannya pernah dipakai memperbaiki sistem, jadi angkanya
+mengukur kecocokan sistem dengan dirinya sendiri. **Hanya `test-2` yang sah.**
+
+Bukti kenapa ini penting: menambal 4 celah kosakata membuat `test-1` melonjak
+85,7% → **100%**, sementara `test-2` yang bersih tetap **71,9%**. Perbaikannya
+tidak menular. Kalau berhenti di angka 100%, yang dilaporkan adalah angka palsu.
+
+⚠️ **Baca [`docs/RETRIEVAL-EVALUATION.md`](docs/RETRIEVAL-EVALUATION.md) sebelum
+menyetel ambang, mengganti model embedding, atau melaporkan angka apa pun.**
+Di situ ada bukti terukur bahwa kemiripan cosine tidak bisa dipakai menyaring
+pertanyaan di luar cakupan, dan kenapa migrasi ke model embedding yang lebih besar
+sudah diuji lalu dibatalkan.
 
 ### Catatan deployment
 Dependensi ONNX + bobot model menambah sekitar 450-500MB. Model dimuat sekali saat

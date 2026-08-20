@@ -299,13 +299,36 @@ diberikan sebagai teks (tidak semua pertanyaan berujung ke navigasi).
 
 | Kondisi | Perilaku |
 |---|---|
-| Retrieval tidak menemukan apa pun di atas ambang kemiripan | Jawab jujur bahwa informasinya tidak tersedia. **Jangan** teruskan ke LLM tanpa konteks, karena itu mengundang jawaban karangan. Nilai ambangnya **ditentukan dari set evaluasi (§10)**, bukan ditebak: ambil nilai yang menyaring pertanyaan di luar cakupan tanpa membuang pertanyaan yang seharusnya terjawab |
+| Retrieval tidak menemukan apa pun di atas ambang kemiripan | Jawab jujur bahwa informasinya tidak tersedia. **Jangan** teruskan ke LLM tanpa konteks, karena itu mengundang jawaban karangan. ⚠️ **Lihat koreksi di bawah tabel: bagian "ambang menyaring pertanyaan di luar cakupan" terbukti salah saat diukur.** |
 | Groq gagal / timeout | HTTP 503 dengan pesan jelas. Tidak ada fallback ke Ollama di sisi server (Ollama adalah LAN lokal developer, tidak terjangkau dari Railway) |
 | Model embedding gagal dimuat saat startup | Service gagal start dengan pesan eksplisit, bukan diam-diam jalan tanpa kemampuan retrieval |
 | `DATABASE_URL` / `GROQ_API_KEY` kosong | Gagal saat startup dengan pesan jelas |
 
 Prinsipnya: gagal dengan berisik di batas sistem, mengikuti pola yang sudah dipakai
 `POST /api/poi/sync` (menolak seluruh sync kalau ada kategori tak dikenal).
+
+### ⚠️ Koreksi pasca-implementasi (2026-08-20)
+
+Rancangan di atas mengasumsikan **ada nilai ambang kemiripan yang bisa menyaring
+pertanyaan di luar cakupan.** Setelah diukur, **asumsi itu salah.**
+
+Bukti: pertanyaan sampah "jadwal kereta ke bandung" mendapat skor cosine **0,348**,
+sementara pertanyaan sah "sebelum usg boleh makan dulu ga" hanya **0,215**. Sampah
+menang atas yang sah, jadi tidak ada satu ambang pun yang memisahkan keduanya.
+Diuji ulang pada model embedding kedua yang lebih besar, hasilnya sama dan malah
+lebih buruk. Ini sifat kemiripan cosine, bukan kelemahan satu model.
+
+**Yang berlaku sekarang:**
+
+- Keputusan relevansi dipindah ke **LLM yang membaca teks chunk-nya**
+  (`generation._SYSTEM_PROMPT` diperkuat untuk menolak pertanyaan di luar urusan RS).
+- Gerbang skor dipertahankan **hanya** untuk menyaring pertanyaan yang benar-benar
+  jauh, dan **tidak lagi diklaim** bisa menyaring semua yang di luar cakupan.
+- Pencarian kata (full-text `indonesian`) **tidak boleh membuka gerbang sendirian**:
+  satu kata kebetulan seperti "resep" atau "cara" langsung mematahkannya.
+
+Angka lengkap, metodologi empat set uji, dan temuan lain ada di
+**`docs/RETRIEVAL-EVALUATION.md`**. Baca itu sebelum menyetel ambang apa pun.
 
 ---
 
