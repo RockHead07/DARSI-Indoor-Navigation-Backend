@@ -10,14 +10,29 @@ import psycopg
 from app.assistant import embedding
 from app.assistant.models import RetrievedChunk, ScheduleRow
 
-# ponytail: dua knob kalibrasi, bukan konstanta fisika. Angkanya ditetapkan lewat
-# scripts/eval_retrieval.py, bukan ditebak. Kalau recall@3 jelek, ini yang disetel.
+# ponytail: knob kalibrasi, bukan konstanta fisika. Angkanya ditetapkan lewat
+# scripts/eval_retrieval.py, bukan ditebak.
 #
-# 0.22, disetel berdasar pengukuran scripts/eval_retrieval.py (recall@3 = 88.9%):
-# pertanyaan seperti "jam besuk kapan" (0.262) dan "usg perut" (0.249) tetap
-# terjawab, sementara pertanyaan di luar cakupan seperti "tiket pesawat" (0.199)
-# tetap tersaring dengan aman.
-MIN_SCORE = 0.22     # di bawah ini dianggap tidak relevan (spec section 8.3)
+# Ambang MUTLAK tunggal (dulu MIN_SCORE) sudah DICABUT, karena terbukti tidak bisa
+# bekerja: skala skor berpindah-pindah antar pertanyaan. Terukur pada corpus ini,
+# pertanyaan di luar cakupan "harga tiket pesawat ke jakarta" skor tertingginya
+# 0.199, sementara jawaban yang BENAR untuk "kalau kecelakaan harus ke mana" hanya
+# 0.126. Sampah menang atas jawaban benar, jadi tidak ada satu angka mutlak pun
+# yang bisa memisahkan keduanya.
+#
+# Gantinya dua tahap:
+#   1. Gerbang relevansi. Kalau chunk TERBAIK pun tidak mencapai MIN_TOP_SCORE,
+#      berarti tidak ada apa pun yang relevan, kembalikan kosong. Ini yang menahan
+#      pertanyaan di luar cakupan.
+#   2. Rentang relatif. Setelah gerbang lolos, ambil chunk yang skornya masih
+#      dalam RELATIVE_RATIO dari peringkat 1. Ini yang mencegah jawaban benar
+#      terbuang cuma karena skala skor pertanyaan itu memang rendah.
+# 0.22 terukur, bukan ditebak: pertanyaan di luar cakupan "harga tiket pesawat ke
+# jakarta" skor tertingginya 0.205, sementara pertanyaan sah "usg perut perlu puasa
+# tidak" mengenai chunk yang benar di 0.249. Jaraknya tipis (0.044), jadi kalau
+# corpus bertambah, angka ini WAJIB diukur ulang, jangan diasumsikan masih aman.
+MIN_TOP_SCORE = 0.22    # gerbang relevansi (spec section 8.3)
+RELATIVE_RATIO = 0.75   # ambil yang skornya >= 75% skor peringkat 1
 FLOOR_BONUS = 0.05   # tambahan skor kalau chunk selantai dengan user
 BUILDING_BONUS = 0.02
 
@@ -59,8 +74,6 @@ def search_chunks(
             skor += FLOOR_BONUS
         if building and r["building"] == building:
             skor += BUILDING_BONUS
-        if skor < MIN_SCORE:
-            continue
         hasil.append(
             RetrievedChunk(
                 content=r["content"],
@@ -74,8 +87,18 @@ def search_chunks(
             )
         )
 
+    if not hasil:
+        return []
+
     hasil.sort(key=lambda c: c.score, reverse=True)
-    return hasil[:limit]
+
+    # Tahap 1: gerbang relevansi. Chunk terbaik pun tidak cukup = tidak ada yang relevan.
+    if hasil[0].score < MIN_TOP_SCORE:
+        return []
+
+    # Tahap 2: rentang relatif terhadap peringkat 1.
+    batas = hasil[0].score * RELATIVE_RATIO
+    return [c for c in hasil if c.score >= batas][:limit]
 
 
 def find_schedules(

@@ -47,7 +47,7 @@ def main() -> int:
 
     total = len(cases)
     print(f"\nrecall@{TOP_K}: {lolos}/{total} = {lolos / total:.1%}")
-    print(f"MIN_SCORE={retrieval.MIN_SCORE}  FLOOR_BONUS={retrieval.FLOOR_BONUS}")
+    print(f"MIN_TOP_SCORE={retrieval.MIN_TOP_SCORE}  RELATIVE_RATIO={retrieval.RELATIVE_RATIO}  FLOOR_BONUS={retrieval.FLOOR_BONUS}")
 
     if gagal:
         print(f"\n{len(gagal)} pertanyaan meleset:")

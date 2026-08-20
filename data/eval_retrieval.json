@@ -4,7 +4,7 @@
   {"q": "syarat daftar pakai bpjs apa saja", "expect": "Alur Pendaftaran BPJS Rawat Jalan"},
   {"q": "rujukan bpjs berlaku berapa lama", "expect": "Alur Pendaftaran BPJS Rawat Jalan"},
   {"q": "kalau kecelakaan harus ke mana", "expect": "Alur Pasien IGD"},
-  {"q": "igd buka 24 jam tidak", "expect": "Alur Pasien IGD"},
+  {"q": "igd buka 24 jam tidak", "expect": "Jam Operasional IGD"},
   {"q": "saya pasien umum cara daftarnya gimana", "expect": "Alur Rawat Jalan Pasien Umum"},
   {"q": "bayar di mana setelah periksa", "expect": "Alur Rawat Jalan Pasien Umum"},
   {"q": "mau rontgen prosedurnya bagaimana", "expect": "Layanan Radiologi"},

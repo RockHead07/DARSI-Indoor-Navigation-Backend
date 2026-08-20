@@ -38,9 +38,32 @@ CHUNKS: list[dict] = [
         "poi_unity_id": None,
         "source_ref": "corpus_simulasi.py#igd",
         "content": (
-            "Alur pasien IGD. Pasien gawat darurat langsung menuju IGD tanpa mendaftar "
-            "lebih dulu. Pendaftaran administrasi diurus keluarga setelah pasien "
-            "ditangani. IGD melayani 24 jam setiap hari termasuk hari libur."
+            "Alur pasien IGD, Instalasi Gawat Darurat, unit emergency. Pasien gawat "
+            "darurat langsung menuju IGD tanpa mendaftar lebih dulu. IGD menangani "
+            "korban kecelakaan, cedera, luka, patah tulang, pendarahan, luka bakar, "
+            "pingsan, kejang, sesak napas, nyeri dada, serangan jantung, stroke, "
+            "keracunan, dan demam tinggi pada anak. Kalau kondisinya mendesak atau "
+            "mengancam nyawa, langsung ke IGD, jangan menunggu antrean poli. "
+            "Pendaftaran administrasi diurus keluarga setelah pasien ditangani."
+        ),
+    },
+    # Sengaja DIPISAH dari chunk di atas. Sebelumnya jam operasional ikut menempel
+    # di sana, dan begitu chunk itu diperkaya daftar kondisi darurat, pertanyaan
+    # "igd buka 24 jam tidak" tidak lagi mengenainya (skor jatuh, kalah dari chunk
+    # lain yang menyebut "24 jam"). Itu efek dilusi: satu chunk memuat dua topik.
+    # Satu chunk = satu topik.
+    {
+        "title": "Jam Operasional IGD",
+        "doc_type": "layanan",
+        "floor": "Lantai 1",
+        "building": "RS Islam Ahmad Yani",
+        "poi_unity_id": None,
+        "source_ref": "corpus_simulasi.py#igd_jam",
+        "content": (
+            "IGD buka 24 jam nonstop, setiap hari, termasuk Sabtu, Minggu, hari libur "
+            "nasional, dan tanggal merah. IGD tidak pernah tutup dan tidak punya jam "
+            "istirahat. Pasien gawat darurat bisa datang kapan saja, siang maupun "
+            "tengah malam."
         ),
     },
     {
@@ -51,8 +74,11 @@ CHUNKS: list[dict] = [
         "poi_unity_id": None,
         "source_ref": "corpus_simulasi.py#umum",
         "content": (
-            "Alur rawat jalan pasien umum non-BPJS. Pasien umum mendaftar langsung di "
-            "loket Pendaftaran tanpa perlu surat rujukan. Pembayaran dilakukan di Kasir "
+            "Alur rawat jalan pasien umum non-BPJS, pasien bayar sendiri, pasien baru "
+            "maupun pasien lama. Cara mendaftar berobat jalan: pasien umum mendaftar "
+            "langsung di loket Pendaftaran tanpa perlu surat rujukan dan tanpa kartu "
+            "BPJS, cukup membawa KTP. Setelah mendaftar, pasien mendapat nomor antrean "
+            "lalu menunggu dipanggil di poli tujuan. Pembayaran dilakukan di Kasir "
             "setelah pemeriksaan selesai. Pendaftaran rawat jalan dibuka pukul 07.00 "
             "sampai 15.00."
         ),
