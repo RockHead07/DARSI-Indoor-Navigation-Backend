@@ -85,9 +85,15 @@ Embedding dihitung di dalam service memakai **ONNX runtime** (`fastembed`), buka
 `sentence-transformers` + `torch`.
 
 Alasan: service ini sekarang sangat ringan (`fastapi`, `uvicorn`, `psycopg`).
-`sentence-transformers` menarik `torch` (~800MB-2GB terpasang) plus bobot model (~470MB),
-berisiko menabrak batas memori/image Railway. ONNX terkuantisasi memberi sifat yang sama
-(lokal, tanpa API key, portable) dengan footprint sekitar **180MB**.
+`sentence-transformers` menarik `torch` (~800MB-2GB terpasang) plus bobot model,
+berisiko menabrak batas memori/image Railway. ONNX memberi sifat yang sama
+(lokal, tanpa API key, portable) dengan footprint jauh lebih kecil.
+
+**Angka terverifikasi (2026-08-20):** model `paraphrase-multilingual-MiniLM-L12-v2`
+berukuran **0.22 GB**, ditambah `onnxruntime` dan tokenizer, totalnya sekitar
+**450-500MB**. (Revisi: draf awal dokumen ini menulis "~180MB", itu taksiran yang
+belum diverifikasi dan terlalu optimistis.) Tetap jauh di bawah jalur `torch`,
+tapi angka inilah yang dipakai saat menilai batas Railway di §11.
 
 Tidak memakai API embedding eksternal karena itu menambah satu API key dan satu titik
 kegagalan baru untuk dijaga, persis masalah yang baru selesai dirapikan di jalur Groq/Ollama.
@@ -192,11 +198,21 @@ Index: HNSW `vector_cosine_ops` pada `embedding`, plus index biasa pada `doc_typ
 | `is_simulated` | boolean NOT NULL DEFAULT true | |
 | `created_at` / `updated_at` | timestamptz | |
 
-### 6.4. Dimensi vektor dikunci sebelum tabel dibuat
+### 6.4. Dimensi vektor: terkunci di 384
 
-`vector(384)` mengacu pada model multilingual kelas MiniLM/e5-small. **Ketersediaan model
-persisnya di ONNX/fastembed diverifikasi saat implementasi, sebelum tabel dibuat.** Kalau
-model final ternyata berdimensi lain, skema disesuaikan lebih dulu, bukan sesudah tabel terisi.
+**Terverifikasi 2026-08-20.** Model yang dipakai:
+`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` lewat `fastembed`.
+
+| properti | nilai |
+|---|---|
+| dimensi | **384** |
+| ukuran | 0.22 GB |
+| Bahasa Indonesia | **didukung**, tercantum eksplisit di daftar 50 bahasa model |
+
+Kandidat lain di fastembed ditolak karena kelebihan ukuran tanpa kebutuhan yang sepadan:
+`paraphrase-multilingual-mpnet-base-v2` (768 dim, 1.0 GB) dan `multilingual-e5-large`
+(1024 dim, 2.24 GB). Catatan: `multilingual-e5-small` yang sempat disebut di draf awal
+**tidak tersedia** di fastembed.
 
 Alasan ini dijadikan aturan eksplisit: mengganti model embedding setelah data masuk berarti
 **seluruh isi tabel harus di-embed ulang**, karena vektor dari dua model berbeda tidak
@@ -362,9 +378,15 @@ pertanyaan pasien sungguhan.
 
 ## 12. Hal yang Diverifikasi Saat Implementasi
 
-Dicatat supaya tidak jadi asumsi yang tersembunyi:
+Ketiganya **sudah diverifikasi 2026-08-20**, sebelum plan implementasi ditulis:
 
-1. Model embedding multilingual mana yang tersedia di ONNX/fastembed, dan dimensinya (§6.4).
-2. Jejak memori dan ukuran image setelah dependensi ONNX masuk, terhadap batas Railway (§11).
-3. Apakah pgvector aktif di instance Supabase Postgres yang dipakai sekarang, atau perlu
-   diaktifkan lebih dulu.
+| # | Pertanyaan | Hasil |
+|---|---|---|
+| 1 | Model embedding multilingual di fastembed, dan dimensinya | `paraphrase-multilingual-MiniLM-L12-v2`, **384 dim**, 0.22 GB, Bahasa Indonesia didukung (§6.4) |
+| 2 | Jejak dependensi ONNX terhadap Railway | **~450-500MB** total (§3.1). Angka draf awal "180MB" salah dan sudah dikoreksi |
+| 3 | pgvector di Supabase Postgres yang dipakai | **Tersedia v0.8.2** (mendukung HNSW), tapi **belum aktif**. Perlu `CREATE EXTENSION vector;` sebagai langkah migrasi pertama |
+
+Sisa risiko yang masih harus diukur saat implementasi berjalan, bukan dari dokumen:
+pemakaian memori runtime sesungguhnya di Railway setelah model dimuat. Kalau melewati
+batas paket yang dipakai, itu keputusan biaya yang disampaikan ke pemilik project, bukan
+diakali dengan menurunkan kualitas model.
