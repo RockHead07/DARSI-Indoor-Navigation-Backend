@@ -67,9 +67,23 @@ def test_bias_lantai_benar_benar_berpengaruh(conn):
         assert lantai2_dengan[0] <= lantai2_tanpa[0]
 
 
-def test_pertanyaan_di_luar_cakupan_tidak_mengembalikan_apa_apa(conn):
-    hasil = retrieval.search_chunks(conn, "harga tiket pesawat ke jakarta", None, None)
-    assert hasil == []
+def test_pertanyaan_yang_jelas_jauh_tersaring(conn):
+    """Gerbang skor hanya menjamin menyaring pertanyaan yang BENAR-BENAR jauh.
+
+    Jaminannya sengaja sesempit ini, dan ini terukur. Kemiripan cosine tidak
+    terkalibrasi untuk menilai relevansi: "harga tiket pesawat ke jakarta"
+    mendapat 0.334 terhadap chunk "Area Parkir" (tiket berdekatan dengan karcis
+    kendaraan), sementara pertanyaan yang sah "sebelum usg boleh makan dulu ga"
+    cuma 0.215. Sampah bisa menang atas yang sah, jadi TIDAK ADA ambang yang
+    memisahkan keduanya. Sudah diuji pada dua model embedding, hasilnya sama.
+
+    Karena itu penolakan pertanyaan di luar urusan RS diputuskan LLM yang membaca
+    teks chunk-nya (lihat generation._SYSTEM_PROMPT), bukan oleh angka ambang.
+    Menuntut test ini menyaring SEMUA pertanyaan di luar cakupan berarti menuntut
+    jaminan yang memang tidak diberikan sistem ini.
+    """
+    assert retrieval.search_chunks(conn, "resep rendang padang yang enak", None, None) == []
+    assert retrieval.search_chunks(conn, "harga emas hari ini berapa", None, None) == []
 
 
 def test_cari_jadwal_lewat_spesialisasi(conn):

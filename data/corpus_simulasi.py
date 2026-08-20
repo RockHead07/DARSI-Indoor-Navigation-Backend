@@ -62,8 +62,9 @@ CHUNKS: list[dict] = [
         "content": (
             "IGD buka 24 jam nonstop, setiap hari, termasuk Sabtu, Minggu, hari libur "
             "nasional, dan tanggal merah. IGD tidak pernah tutup dan tidak punya jam "
-            "istirahat. Pasien gawat darurat bisa datang kapan saja, siang maupun "
-            "tengah malam."
+            "istirahat. Pasien gawat darurat tetap dilayani kapan saja: pagi, siang, "
+            "sore, malam hari, larut malam, tengah malam, dini hari, maupun subuh. "
+            "Di luar jam poli, IGD adalah satu-satunya layanan yang tetap buka."
         ),
     },
     {
@@ -104,10 +105,12 @@ CHUNKS: list[dict] = [
         "poi_unity_id": None,
         "source_ref": "corpus_simulasi.py#radiologi",
         "content": (
-            "Radiologi melayani pemeriksaan rontgen, USG, dan CT scan. Pemeriksaan "
-            "harus membawa surat pengantar dari dokter. Pemeriksaan USG perut "
-            "mengharuskan pasien berpuasa 6 jam sebelumnya. Layanan buka pukul 08.00 "
-            "sampai 20.00, dan 24 jam untuk kasus dari IGD."
+            "Radiologi melayani foto rontgen, sinar X, USG, dan CT scan. Di sinilah "
+            "tulang, dada, dan organ dalam difoto, termasuk untuk memastikan tulang "
+            "retak atau patah. Pemeriksaan harus membawa surat pengantar dari dokter. "
+            "Sebelum USG perut, pasien wajib berpuasa, tidak makan dan tidak minum "
+            "selama 6 jam. Layanan buka pukul 08.00 sampai 20.00, dan 24 jam untuk "
+            "kasus dari IGD."
         ),
     },
     {
@@ -118,9 +121,10 @@ CHUNKS: list[dict] = [
         "poi_unity_id": None,
         "source_ref": "corpus_simulasi.py#lab",
         "content": (
-            "Laboratorium melayani pemeriksaan darah, urine, dan sampel lain. "
-            "Pengambilan sampel darah puasa dilayani pukul 07.00 sampai 09.00. Hasil "
-            "pemeriksaan rutin keluar di hari yang sama."
+            "Laboratorium melayani cek darah, tes darah, periksa urine atau air seni, "
+            "dahak, dan sampel lain. Tersedia pemeriksaan gula darah, kolesterol, asam "
+            "urat, dan fungsi ginjal. Pengambilan sampel darah puasa dilayani pukul "
+            "07.00 sampai 09.00. Hasil pemeriksaan rutin keluar di hari yang sama."
         ),
     },
     {
@@ -197,9 +201,182 @@ CHUNKS: list[dict] = [
         "poi_unity_id": None,
         "source_ref": "corpus_simulasi.py#faq_rekam_medis",
         "content": (
-            "Permintaan salinan rekam medis diajukan di bagian Rekam Medis Lantai 1 "
-            "dengan membawa KTP pasien. Permintaan oleh keluarga memerlukan surat kuasa. "
-            "Berkas selesai dalam 3 hari kerja."
+            "Permintaan salinan rekam medis, fotokopi hasil pemeriksaan, hasil lab, "
+            "atau resume medis diajukan di bagian Rekam Medis Lantai 1 dengan membawa "
+            "KTP pasien. Permintaan oleh keluarga memerlukan surat kuasa. Berkas "
+            "selesai dalam 3 hari kerja."
+        ),
+    },
+
+    # ── Perluasan corpus (tahap 2) ────────────────────────────────────────────
+    # Ditulis untuk menutup topik yang lazim ditanyakan di RS tapi belum terwakili,
+    # bukan sekadar mengejar soal uji yang gagal. Kosakatanya sengaja memakai
+    # istilah awam sekaligus istilah resmi, karena pasien memakai keduanya.
+    {
+        "title": "Kasir dan Cara Pembayaran",
+        "doc_type": "layanan",
+        "floor": "Lantai 1",
+        "building": "RS Islam Ahmad Yani",
+        "poi_unity_id": None,
+        "source_ref": "corpus_simulasi.py#kasir",
+        "content": (
+            "Kasir melayani pembayaran biaya pemeriksaan, obat, dan tindakan. "
+            "Pembayaran bisa tunai, kartu debit, kartu kredit, dan QRIS. Pasien umum "
+            "membayar setelah pemeriksaan selesai. Pasien BPJS tidak membayar biaya "
+            "yang ditanggung, tetapi selisih biaya naik kelas dibayar di Kasir. "
+            "Kuitansi diminta di loket yang sama."
+        ),
+    },
+    {
+        "title": "Rawat Inap dan Kelas Kamar",
+        "doc_type": "layanan",
+        "floor": "Lantai 2",
+        "building": "RS Islam Ahmad Yani",
+        "poi_unity_id": None,
+        "source_ref": "corpus_simulasi.py#rawat_inap",
+        "content": (
+            "Rawat inap atau opname tersedia dalam kelas 3, kelas 2, kelas 1, dan VIP. "
+            "Pasien BPJS mendapat kelas sesuai haknya dan boleh naik kelas dengan "
+            "membayar selisih. Pendaftaran rawat inap diurus di Admisi setelah dokter "
+            "menyatakan pasien perlu menginap. Satu penunggu pasien diperbolehkan "
+            "menginap di kamar."
+        ),
+    },
+    {
+        "title": "Poli Gigi",
+        "doc_type": "layanan",
+        "floor": "Lantai 2",
+        "building": "RS Islam Ahmad Yani",
+        "poi_unity_id": None,
+        "source_ref": "corpus_simulasi.py#poli_gigi",
+        "content": (
+            "Poli Gigi melayani sakit gigi, gigi berlubang, tambal gigi, cabut gigi, "
+            "pembersihan karang gigi, dan pemasangan gigi palsu. Tindakan cabut gigi "
+            "tidak dilakukan saat gusi sedang bengkak dan meradang."
+        ),
+    },
+    {
+        "title": "Poli Mata",
+        "doc_type": "layanan",
+        "floor": "Lantai 2",
+        "building": "RS Islam Ahmad Yani",
+        "poi_unity_id": None,
+        "source_ref": "corpus_simulasi.py#poli_mata",
+        "content": (
+            "Poli Mata melayani pemeriksaan mata, keluhan mata merah, mata gatal, "
+            "penglihatan kabur, minus, plus, silinder, pemeriksaan katarak, dan "
+            "pembuatan resep kacamata."
+        ),
+    },
+    {
+        "title": "Poli Kandungan dan Kebidanan",
+        "doc_type": "layanan",
+        "floor": "Lantai 2",
+        "building": "RS Islam Ahmad Yani",
+        "poi_unity_id": None,
+        "source_ref": "corpus_simulasi.py#poli_obgyn",
+        "content": (
+            "Poli Kandungan dan Kebidanan melayani pemeriksaan kehamilan, kontrol "
+            "rutin ibu hamil, USG kandungan, keluhan haid, keputihan, program hamil, "
+            "dan konsultasi keluarga berencana atau KB. Ibu yang akan melahirkan "
+            "ditangani di Ruang Bersalin, bukan di poli."
+        ),
+    },
+    {
+        "title": "Area Parkir",
+        "doc_type": "layanan",
+        "floor": "Ground",
+        "building": "RS Islam Ahmad Yani",
+        "poi_unity_id": None,
+        "source_ref": "corpus_simulasi.py#parkir",
+        "content": (
+            "Area parkir kendaraan pengunjung tersedia untuk mobil dan sepeda motor, "
+            "terletak di area depan dan samping gedung. Karcis parkir diambil di pintu "
+            "masuk dan dibayar saat keluar. Parkir khusus karyawan terpisah dari parkir "
+            "pengunjung."
+        ),
+    },
+    {
+        "title": "Kantin dan Tempat Makan",
+        "doc_type": "layanan",
+        "floor": "Lantai 1",
+        "building": "RS Islam Ahmad Yani",
+        "poi_unity_id": None,
+        "source_ref": "corpus_simulasi.py#kantin",
+        "content": (
+            "Kantin menyediakan makanan dan minuman untuk pengunjung serta keluarga "
+            "pasien, buka pukul 06.00 sampai 21.00. Makanan pasien rawat inap diatur "
+            "terpisah oleh Instalasi Gizi sesuai diet yang ditentukan dokter, jadi "
+            "keluarga sebaiknya tidak membawakan makanan dari luar tanpa izin perawat."
+        ),
+    },
+    {
+        "title": "ATM dan Layanan Perbankan",
+        "doc_type": "layanan",
+        "floor": "Lantai 1",
+        "building": "RS Islam Ahmad Yani",
+        "poi_unity_id": None,
+        "source_ref": "corpus_simulasi.py#atm",
+        "content": (
+            "Mesin ATM tersedia di Lantai 1 dekat lobi utama untuk tarik tunai dan "
+            "transfer. Tersedia beberapa bank. Kalau ATM sedang gangguan, pembayaran "
+            "di Kasir tetap bisa memakai kartu debit atau QRIS."
+        ),
+    },
+    {
+        "title": "Layanan Ambulans",
+        "doc_type": "layanan",
+        "floor": "Lantai 1",
+        "building": "RS Islam Ahmad Yani",
+        "poi_unity_id": None,
+        "source_ref": "corpus_simulasi.py#ambulans",
+        "content": (
+            "Layanan ambulans tersedia 24 jam untuk menjemput pasien, rujukan antar "
+            "rumah sakit, dan mengantar jenazah. Permintaan ambulans diajukan lewat "
+            "IGD atau bagian Informasi. Biaya ambulans dihitung berdasarkan jarak "
+            "tempuh."
+        ),
+    },
+    {
+        "title": "Fisioterapi dan Rehabilitasi Medik",
+        "doc_type": "layanan",
+        "floor": "Lantai 1",
+        "building": "RS Islam Ahmad Yani",
+        "poi_unity_id": None,
+        "source_ref": "corpus_simulasi.py#fisio",
+        "content": (
+            "Fisioterapi atau rehabilitasi medik melayani terapi pasca patah tulang, "
+            "nyeri punggung, nyeri lutut, kaku sendi, pemulihan pasca stroke, dan "
+            "latihan jalan. Terapi dijadwalkan beberapa kali pertemuan dan memerlukan "
+            "surat pengantar dari dokter."
+        ),
+    },
+    {
+        "title": "Medical Check Up dan Surat Keterangan Sehat",
+        "doc_type": "layanan",
+        "floor": "Lantai 1",
+        "building": "RS Islam Ahmad Yani",
+        "poi_unity_id": None,
+        "source_ref": "corpus_simulasi.py#mcu",
+        "content": (
+            "Medical check up melayani pemeriksaan kesehatan berkala, syarat melamar "
+            "kerja, syarat sekolah, dan syarat perjalanan. Surat keterangan sehat dan "
+            "surat keterangan sakit diterbitkan setelah pemeriksaan dokter. Pemeriksaan "
+            "MCU sebaiknya dilakukan pagi hari dalam kondisi puasa."
+        ),
+    },
+    {
+        "title": "Informasi dan Cara Membuat Janji Temu",
+        "doc_type": "layanan",
+        "floor": "Lantai 1",
+        "building": "RS Islam Ahmad Yani",
+        "poi_unity_id": None,
+        "source_ref": "corpus_simulasi.py#janji",
+        "content": (
+            "Bagian Informasi di lobi Lantai 1 membantu pertanyaan umum, penunjuk arah, "
+            "dan pendaftaran janji temu dengan dokter. Janji temu bisa dibuat langsung "
+            "di loket atau lewat telepon pada jam kerja. Pasien yang sudah punya janji "
+            "tetap perlu mendaftar ulang di loket sebelum masuk poli."
         ),
     },
 ]

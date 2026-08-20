@@ -31,9 +31,14 @@ TOP_K = 3
 #             karena sistemnya memang disetel terhadap set ini.
 #   holdout — soal bergaya awam yang TIDAK pernah dipakai menyetel apa pun.
 #             Inilah angka yang layak dilaporkan.
+#   test    — set BERSIH. Ditulis setelah corpus diperluas dan sebelum pengukuran
+#             apa pun, dan tidak pernah dipakai menyetel. Ini angka yang paling
+#             layak dilaporkan. Begitu isinya dipakai memperbaiki sistem, set ini
+#             ikut terbakar dan harus diganti set baru.
 SET_UJI = [
     ("tuning ", DATA_DIR / "eval_retrieval.json"),
-    ("holdout", DATA_DIR / "eval_holdout.json"),
+    ("dev    ", DATA_DIR / "eval_holdout.json"),
+    ("test   ", DATA_DIR / "eval_test.json"),
 ]
 
 
@@ -74,8 +79,9 @@ def main() -> int:
                 print(f"  - \"{q}\"\n      harusnya: {harap}\n      dapatnya: {dapat}")
 
     print("\nCATATAN: diukur di atas corpus SIMULASI.")
-    print("Angka [tuning] optimistis (sistem disetel terhadapnya).")
-    print("Angka [holdout] yang layak dilaporkan.")
+    print("[tuning] dipakai menyetel ambang. Optimistis, JANGAN dilaporkan.")
+    print("[dev]    pernah dilihat kegagalannya saat memperbaiki corpus. Ikut terbakar.")
+    print("[test]   belum pernah dipakai memperbaiki apa pun. INI yang dilaporkan.")
     return 0
 
 
