@@ -16,6 +16,47 @@ self-hosted Postgres. Migration is a connection-string change.
 No response ever includes a distance/meter field — deliberate (ADR-007). Distance is
 computed inside Unity after localize, never served here.
 
+## Assistant (RAG)
+
+`POST /api/assistant/query` — tanya jawab layanan RS berbasis retrieval.
+Spec: `docs/superpowers/specs/2026-08-20-rag-assistant-backend-design.md`.
+
+Retrieval hybrid: prosa (SOP/layanan/FAQ) lewat pgvector, jadwal dokter lewat SQL
+biasa. Jadwal sengaja tidak di-embed karena itu lookup, bukan pencarian makna.
+
+⚠️ **Seluruh isi corpus saat ini DATA SIMULASI.** Setiap baris ditandai
+`is_simulated = true`, dan response membawa `contains_simulated_data`. Antarmuka
+yang menampilkan jawaban WAJIB menampilkan penanda data simulasi selama flag itu
+menyala. Nama dokter memakai pola "Fulan/Fulanah" supaya jelas fiktif.
+
+Mengganti ke data asli:
+```bash
+psql "$DATABASE_URL" -c "DELETE FROM knowledge_chunks WHERE is_simulated = true;"
+psql "$DATABASE_URL" -c "DELETE FROM doctor_schedules  WHERE is_simulated = true;"
+# lalu ingest ulang dengan is_simulated = false
+```
+
+### Setup
+```bash
+psql "$DATABASE_URL" -f schema_rag.sql   # butuh ekstensi pgvector
+python -m scripts.ingest_corpus
+```
+
+Env var tambahan: `GROQ_API_KEY` (dipanggil dari server, tidak pernah ikut ke APK).
+
+### Evaluasi retrieval
+```bash
+python -m scripts.eval_retrieval
+```
+Mencetak recall@3 terhadap `data/eval_retrieval.json`. Angkanya diukur di atas
+corpus simulasi, jadi mengukur mekanisme retrieval, bukan kesiapan lapangan.
+
+### Catatan deployment
+Dependensi ONNX + bobot model menambah sekitar 450-500MB. Model dimuat sekali saat
+startup lewat `lifespan`. Kalau pemakaian memori Railway melewati batas paket, itu
+keputusan biaya yang perlu dibicarakan, bukan diakali dengan menurunkan kualitas model.
+
+
 ## Files
 - `schema.sql` — `pois` table (standard SQL)
 - `seed.sql` — **usang, jangan dijalankan** (ADR-021). Isinya 11 POI scene kampus lama;

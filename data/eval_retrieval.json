@@ -1,0 +1,20 @@
+[
+  {"q": "mau nebus resep obat di mana", "expect": "Layanan Farmasi"},
+  {"q": "apotek buka jam berapa", "expect": "Layanan Farmasi"},
+  {"q": "syarat daftar pakai bpjs apa saja", "expect": "Alur Pendaftaran BPJS Rawat Jalan"},
+  {"q": "rujukan bpjs berlaku berapa lama", "expect": "Alur Pendaftaran BPJS Rawat Jalan"},
+  {"q": "kalau kecelakaan harus ke mana", "expect": "Alur Pasien IGD"},
+  {"q": "igd buka 24 jam tidak", "expect": "Alur Pasien IGD"},
+  {"q": "saya pasien umum cara daftarnya gimana", "expect": "Alur Rawat Jalan Pasien Umum"},
+  {"q": "bayar di mana setelah periksa", "expect": "Alur Rawat Jalan Pasien Umum"},
+  {"q": "mau rontgen prosedurnya bagaimana", "expect": "Layanan Radiologi"},
+  {"q": "usg perut perlu puasa tidak", "expect": "Layanan Radiologi"},
+  {"q": "cek darah jam berapa", "expect": "Layanan Laboratorium"},
+  {"q": "poli anak ada di lantai berapa", "expect": "Poli Anak"},
+  {"q": "imunisasi anak di mana", "expect": "Poli Anak"},
+  {"q": "konsultasi diabetes ke poli apa", "expect": "Poli Penyakit Dalam"},
+  {"q": "mau sholat di mana", "expect": "Musholla dan Fasilitas Ibadah"},
+  {"q": "bisa berobat tanpa rujukan tidak", "expect": "FAQ: Berobat tanpa surat rujukan"},
+  {"q": "jam besuk kapan", "expect": "FAQ: Jam besuk pasien rawat inap"},
+  {"q": "cara minta salinan rekam medis", "expect": "FAQ: Cara mendapatkan salinan rekam medis"}
+]

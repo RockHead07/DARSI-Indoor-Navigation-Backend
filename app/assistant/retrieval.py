@@ -13,13 +13,14 @@ from app.assistant.models import RetrievedChunk, ScheduleRow
 # ponytail: dua knob kalibrasi, bukan konstanta fisika. Angkanya ditetapkan lewat
 # scripts/eval_retrieval.py, bukan ditebak. Kalau recall@3 jelek, ini yang disetel.
 #
-# 0.30, diturunkan dari 0.35 berdasar pengukuran: pertanyaan "syarat daftar pakai
-# bpjs apa saja" memberi skor 0.344 pada chunk "Alur Pendaftaran BPJS Rawat Jalan",
-# jadi ambang 0.35 membuang chunk yang justru jawabannya. Menaikkan lagi berarti
-# menyembunyikan informasi yang relevan.
-MIN_SCORE = 0.30     # di bawah ini dianggap tidak relevan (spec section 8.3)
+# 0.22, disetel berdasar pengukuran scripts/eval_retrieval.py (recall@3 = 88.9%):
+# pertanyaan seperti "jam besuk kapan" (0.262) dan "usg perut" (0.249) tetap
+# terjawab, sementara pertanyaan di luar cakupan seperti "tiket pesawat" (0.199)
+# tetap tersaring dengan aman.
+MIN_SCORE = 0.22     # di bawah ini dianggap tidak relevan (spec section 8.3)
 FLOOR_BONUS = 0.05   # tambahan skor kalau chunk selantai dengan user
 BUILDING_BONUS = 0.02
+
 
 # Ambil lebih banyak dari yang dipakai, supaya bias lantai punya ruang menyusun
 # ulang peringkat. Pembiasan dilakukan di Python, BUKAN di ORDER BY SQL: menaruh
