@@ -28,6 +28,9 @@ from psycopg_pool import ConnectionPool
 from psycopg.rows import dict_row
 from pydantic import BaseModel
 
+from app.assistant import embedding
+from app.assistant.router import router as assistant_router
+
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 POI_SYNC_TOKEN = os.environ.get("POI_SYNC_TOKEN", "")
 
@@ -70,6 +73,20 @@ async def lifespan(app: FastAPI):
         check=ConnectionPool.check_connection,
     )
     app.state.pool.open()
+
+    # Gagal berisik di startup, bukan diam-diam jalan lalu error saat request
+    # pertama masuk (spec section 8.3).
+    if not os.environ.get("GROQ_API_KEY", ""):
+        raise RuntimeError(
+            "GROQ_API_KEY kosong. Endpoint /api/assistant/query tidak bisa berfungsi."
+        )
+
+    # Muat model embedding sekali di startup, bukan per-request. Tanpa ini request
+    # pertama akan lambat seperti gejala pre-warm Ollama di repo Unity. Kalau bobot
+    # model gagal dimuat, exception di sini menggagalkan startup — itu memang yang
+    # diinginkan, daripada service hidup tanpa kemampuan retrieval.
+    embedding.load_model()
+
     try:
         yield
     finally:
@@ -85,9 +102,12 @@ app = FastAPI(title="DARSI POI API", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()],
-    allow_methods=["GET", "PUT"],
+    allow_methods=["GET", "PUT", "POST"],
     allow_headers=["*"],
 )
+
+app.include_router(assistant_router)
+
 
 
 def _fetch(sql: str, params: tuple = ()):
