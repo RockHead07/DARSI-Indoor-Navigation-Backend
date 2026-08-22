@@ -10,61 +10,77 @@ Semua baris masuk DB dengan is_simulated = true. Saat data asli tersedia:
 lalu ingest ulang dengan is_simulated = false.
 """
 
-# poi_unity_id sengaja None: GUID POI berasal dari Unity lewat POST /api/poi/sync,
-# dan POI seperti "Poli Anak" belum ada di scene. Menebak GUID di sini justru
-# melanggar aturan "satu pemilik data" (ADR-021). Isi belakangan setelah POI-nya
-# benar-benar ada, atau biarkan None (jawaban tetap keluar, cuma tanpa tombol rute).
+# Mapping GUID resmi dari scene Unity (TestingHCM.unity / POIData):
+# IGD: 033e7541-05e9-4726-bc84-0825c5d12e10 (Lantai 1)
+# Farmasi: de030876-deb4-427e-92af-382a38a2d669 (Lantai 1)
+# Radiologi: 207c8f68-f4ea-45de-9f0f-7d7be08cd633 (Lantai 1)
+# Ruang X-Ray: 8e3021a9-76a3-48ab-9e87-f5d832a3921c (Lantai 1)
+# Resepsionis: b328d86f-541a-4148-b82c-e4fc2a5939ea (Lantai 1)
+# Toilet: dc295a0d-434d-4c41-9728-5bd9f8a0fb0b (Lantai 1)
+# Lift Lantai 1: d52a7a82-ce07-47d3-a5ba-d2b07c678a0c (Lantai 1)
+# Lift Lantai 2: b3a375ee-9aa8-476a-bd6a-8a68b7308896 (Lantai 2)
+# Parkir Mobil: 58139f04-3ca8-4f9c-87b7-f0a9887ed0de (Ground)
+# Parkir Motor Karyawan: e42f1d1f-5b4d-45a5-93e4-07e88a6a6618 (Ground)
+# Ground (Lobi Utama): eb8f0e33-2832-484e-862a-c123b2259b05 (Ground)
+
 CHUNKS: list[dict] = [
     {
-        "title": "Alur Pendaftaran BPJS Rawat Jalan",
+        "title": "Alur Pasien IGD dan Penanganan Darurat",
         "doc_type": "sop",
         "floor": "Lantai 1",
         "building": "RS Islam Ahmad Yani",
-        "poi_unity_id": None,
-        "source_ref": "corpus_simulasi.py#bpjs",
-        "content": (
-            "Alur pendaftaran pasien BPJS rawat jalan. Pasien BPJS membawa kartu BPJS "
-            "aktif, KTP, dan surat rujukan dari Faskes 1 yang masih berlaku. Rujukan "
-            "berlaku 90 hari sejak diterbitkan. Pendaftaran dilayani di loket "
-            "Pendaftaran BPJS di Lantai 1 mulai pukul 07.00. Setelah mendapat nomor "
-            "antrean, pasien menunggu panggilan di ruang tunggu poli tujuan."
-        ),
-    },
-    {
-        "title": "Alur Pasien IGD",
-        "doc_type": "sop",
-        "floor": "Lantai 1",
-        "building": "RS Islam Ahmad Yani",
-        "poi_unity_id": None,
+        "poi_unity_id": "033e7541-05e9-4726-bc84-0825c5d12e10",
         "source_ref": "corpus_simulasi.py#igd",
         "content": (
-            "Alur pasien IGD, Instalasi Gawat Darurat, unit emergency. Pasien gawat "
-            "darurat langsung menuju IGD tanpa mendaftar lebih dulu. IGD menangani "
-            "korban kecelakaan, cedera, luka, patah tulang, pendarahan, luka bakar, "
-            "pingsan, kejang, sesak napas, nyeri dada, serangan jantung, stroke, "
-            "keracunan, dan demam tinggi pada anak. Kalau kondisinya mendesak atau "
-            "mengancam nyawa, langsung ke IGD, jangan menunggu antrean poli. "
-            "Pendaftaran administrasi diurus keluarga setelah pasien ditangani."
+            "Alur pasien IGD (Instalasi Gawat Darurat) dan unit emergency. Pasien gawat "
+            "darurat langsung menuju IGD di Lantai 1 tanpa mendaftar lebih dulu di loket biasa. "
+            "IGD menangani korban kecelakaan lalu lintas, tabrakan motor, tabrakan mobil, "
+            "jatuh dari ketinggian, luka robek, pendarahan hebat, patah tulang, cedera kepala, "
+            "luka bakar, pingsan, tidak sadarkan diri, kejang-kejang, sesak napas akut, "
+            "nyeri dada mendadak, serangan jantung, stroke, keracunan makanan/zat kimia, "
+            "dan demam tinggi mendadak atau step pada anak. Jika kondisi darurat atau "
+            "mengancam nyawa, segera masuk IGD. Administrasi diurus keluarga belakangan."
         ),
     },
-    # Sengaja DIPISAH dari chunk di atas. Sebelumnya jam operasional ikut menempel
-    # di sana, dan begitu chunk itu diperkaya daftar kondisi darurat, pertanyaan
-    # "igd buka 24 jam tidak" tidak lagi mengenainya (skor jatuh, kalah dari chunk
-    # lain yang menyebut "24 jam"). Itu efek dilusi: satu chunk memuat dua topik.
-    # Satu chunk = satu topik.
     {
         "title": "Jam Operasional IGD",
         "doc_type": "layanan",
         "floor": "Lantai 1",
         "building": "RS Islam Ahmad Yani",
-        "poi_unity_id": None,
+        "poi_unity_id": "033e7541-05e9-4726-bc84-0825c5d12e10",
         "source_ref": "corpus_simulasi.py#igd_jam",
         "content": (
-            "IGD buka 24 jam nonstop, setiap hari, termasuk Sabtu, Minggu, hari libur "
-            "nasional, dan tanggal merah. IGD tidak pernah tutup dan tidak punya jam "
-            "istirahat. Pasien gawat darurat tetap dilayani kapan saja: pagi, siang, "
-            "sore, malam hari, larut malam, tengah malam, dini hari, maupun subuh. "
-            "Di luar jam poli, IGD adalah satu-satunya layanan yang tetap buka."
+            "IGD buka 24 jam nonstop setiap hari termasuk Sabtu, Minggu, dan hari libur nasional. "
+            "Layanan gawat darurat, dokter jaga, perawat emergency, dan ambulans siap 24 jam. "
+            "Di luar jam buka poliklinik rawat jalan, IGD adalah unit utama yang melayani pasien darurat."
+        ),
+    },
+    {
+        "title": "Layanan Farmasi dan Pengambilan Obat",
+        "doc_type": "layanan",
+        "floor": "Lantai 1",
+        "building": "RS Islam Ahmad Yani",
+        "poi_unity_id": "de030876-deb4-427e-92af-382a38a2d669",
+        "source_ref": "corpus_simulasi.py#farmasi",
+        "content": (
+            "Layanan Farmasi dan Apotek RS melayani penebusan resep obat dokter, pembelian obat bebas, "
+            "serta obat racikan untuk pasien rawat jalan maupun rawat inap. Farmasi berada di Lantai 1. "
+            "Jam operasional apotek adalah pukul 07.00 sampai 21.00 WIB. Resep BPJS dilayani di loket "
+            "khusus BPJS, sedangkan resep umum/pribadi di loket farmasi umum."
+        ),
+    },
+    {
+        "title": "Alur Pendaftaran BPJS Rawat Jalan",
+        "doc_type": "sop",
+        "floor": "Lantai 1",
+        "building": "RS Islam Ahmad Yani",
+        "poi_unity_id": "b328d86f-541a-4148-b82c-e4fc2a5939ea",
+        "source_ref": "corpus_simulasi.py#bpjs",
+        "content": (
+            "Alur pendaftaran pasien BPJS rawat jalan. Pasien membawa kartu BPJS/KIS aktif, KTP, dan "
+            "surat rujukan dari Faskes 1 (Puskesmas/Klinik) yang masih berlaku. Rujukan berlaku 90 hari. "
+            "Pendaftaran dilayani di Loket Resepsionis / Pendaftaran BPJS di Lantai 1 mulai pukul 07.00. "
+            "Setelah mengambil nomor antrean dan diverifikasi petugas, pasien menuju ruang tunggu poli tujuan."
         ),
     },
     {
@@ -72,29 +88,12 @@ CHUNKS: list[dict] = [
         "doc_type": "sop",
         "floor": "Lantai 1",
         "building": "RS Islam Ahmad Yani",
-        "poi_unity_id": None,
+        "poi_unity_id": "b328d86f-541a-4148-b82c-e4fc2a5939ea",
         "source_ref": "corpus_simulasi.py#umum",
         "content": (
-            "Alur rawat jalan pasien umum non-BPJS, pasien bayar sendiri, pasien baru "
-            "maupun pasien lama. Cara mendaftar berobat jalan: pasien umum mendaftar "
-            "langsung di loket Pendaftaran tanpa perlu surat rujukan dan tanpa kartu "
-            "BPJS, cukup membawa KTP. Setelah mendaftar, pasien mendapat nomor antrean "
-            "lalu menunggu dipanggil di poli tujuan. Pembayaran dilakukan di Kasir "
-            "setelah pemeriksaan selesai. Pendaftaran rawat jalan dibuka pukul 07.00 "
-            "sampai 15.00."
-        ),
-    },
-    {
-        "title": "Layanan Farmasi",
-        "doc_type": "layanan",
-        "floor": "Lantai 1",
-        "building": "RS Islam Ahmad Yani",
-        "poi_unity_id": None,
-        "source_ref": "corpus_simulasi.py#farmasi",
-        "content": (
-            "Farmasi melayani penebusan resep pasien rawat jalan dan rawat inap. Jam "
-            "layanan pukul 07.00 sampai 21.00. Resep BPJS dilayani di loket terpisah "
-            "dari resep umum. Obat racikan membutuhkan waktu tunggu lebih lama."
+            "Alur rawat jalan pasien umum (non-BPJS/bayar pribadi). Pasien umum mendaftar langsung di Loket "
+            "Resepsionis / Pendaftaran Lantai 1 dengan menunjukkan KTP tanpa perlu surat rujukan. Pendaftaran "
+            "dibuka pukul 07.00 hingga 15.00 WIB. Setelah pemeriksaan di poli selesai, pembayaran dilakukan di Kasir."
         ),
     },
     {
@@ -102,15 +101,27 @@ CHUNKS: list[dict] = [
         "doc_type": "layanan",
         "floor": "Lantai 1",
         "building": "RS Islam Ahmad Yani",
-        "poi_unity_id": None,
+        "poi_unity_id": "207c8f68-f4ea-45de-9f0f-7d7be08cd633",
         "source_ref": "corpus_simulasi.py#radiologi",
         "content": (
-            "Radiologi melayani foto rontgen, sinar X, USG, dan CT scan. Di sinilah "
-            "tulang, dada, dan organ dalam difoto, termasuk untuk memastikan tulang "
-            "retak atau patah. Pemeriksaan harus membawa surat pengantar dari dokter. "
-            "Sebelum USG perut, pasien wajib berpuasa, tidak makan dan tidak minum "
-            "selama 6 jam. Layanan buka pukul 08.00 sampai 20.00, dan 24 jam untuk "
-            "kasus dari IGD."
+            "Instalasi Radiologi melayani pemeriksaan radiologi diagnostik lengkap, meliputi USG perut, "
+            "USG kandungan, CT scan, dan pemeriksaan rontgen sinar-X. Pasien yang memerlukan pemeriksaan "
+            "organ dalam atau dugaan patah tulang dirujuk ke Radiologi di Lantai 1. Pemeriksaan memerlukan "
+            "surat pengantar dokter. Sebelum USG perut, pasien wajib puasa 6 jam. Layanan buka 08.00-20.00 "
+            "dan 24 jam untuk pasien darurat IGD."
+        ),
+    },
+    {
+        "title": "Ruang X-Ray dan Foto Rontgen",
+        "doc_type": "layanan",
+        "floor": "Lantai 1",
+        "building": "RS Islam Ahmad Yani",
+        "poi_unity_id": "8e3021a9-76a3-48ab-9e87-f5d832a3921c",
+        "source_ref": "corpus_simulasi.py#xray",
+        "content": (
+            "Ruang X-Ray (Foto Rontgen) melayani foto rontgen dada (thorax), rontgen tulang, rontgen gigi, "
+            "dan rontgen kepala/anggota gerak untuk mendeteksi retak tulang, patah tulang, atau infeksi paru. "
+            "Ruang X-Ray berada di bagian Radiologi Lantai 1."
         ),
     },
     {
@@ -121,10 +132,10 @@ CHUNKS: list[dict] = [
         "poi_unity_id": None,
         "source_ref": "corpus_simulasi.py#lab",
         "content": (
-            "Laboratorium melayani cek darah, tes darah, periksa urine atau air seni, "
+            "Laboratorium melayani cek darah lengkap, tes darah, periksa urine atau air seni, "
             "dahak, dan sampel lain. Tersedia pemeriksaan gula darah, kolesterol, asam "
             "urat, dan fungsi ginjal. Pengambilan sampel darah puasa dilayani pukul "
-            "07.00 sampai 09.00. Hasil pemeriksaan rutin keluar di hari yang sama."
+            "07.00 sampai 09.00 di Lantai 1. Hasil pemeriksaan rutin keluar di hari yang sama."
         ),
     },
     {
@@ -135,9 +146,9 @@ CHUNKS: list[dict] = [
         "poi_unity_id": None,
         "source_ref": "corpus_simulasi.py#poli_anak",
         "content": (
-            "Poli Anak berada di Lantai 2 dan melayani pemeriksaan kesehatan anak, "
-            "imunisasi, serta konsultasi tumbuh kembang. Pasien anak dengan demam "
-            "tinggi disarankan langsung ke IGD."
+            "Poli Anak berada di Lantai 2 dan melayani pemeriksaan kesehatan anak, bayi, balita, "
+            "imunisasi rutin, serta konsultasi tumbuh kembang. Pasien anak dengan kondisi gawat darurat "
+            "seperti demam sangat tinggi, kejang, atau sesak napas disarankan langsung menuju IGD di Lantai 1."
         ),
     },
     {
@@ -148,10 +159,9 @@ CHUNKS: list[dict] = [
         "poi_unity_id": None,
         "source_ref": "corpus_simulasi.py#poli_dalam",
         "content": (
-            "Poli Penyakit Dalam berada di Lantai 2, melayani konsultasi penyakit kronis "
-            "pada orang dewasa seperti diabetes atau kencing manis, hipertensi atau "
-            "tekanan darah tinggi, kolesterol tinggi, asam urat, penyakit lambung, "
-            "tipes, dan gangguan pencernaan."
+            "Poli Penyakit Dalam berada di Lantai 2, melayani konsultasi dan pengobatan penyakit kronis "
+            "pada orang dewasa seperti diabetes (kencing manis), hipertensi (darah tinggi), kolesterol, "
+            "asam urat, maag/GERD lambung, tipes, gangguan ginjal, dan gangguan pencernaan."
         ),
     },
     {
@@ -179,7 +189,7 @@ CHUNKS: list[dict] = [
         "content": (
             "Apakah bisa berobat tanpa rujukan? Pasien umum bisa langsung mendaftar "
             "tanpa rujukan. Pasien BPJS memerlukan rujukan dari Faskes 1, kecuali "
-            "kasus gawat darurat yang ditangani IGD."
+            "kasus gawat darurat yang langsung ditangani IGD."
         ),
     },
     {
@@ -200,33 +210,26 @@ CHUNKS: list[dict] = [
         "doc_type": "faq",
         "floor": "Lantai 1",
         "building": "RS Islam Ahmad Yani",
-        "poi_unity_id": None,
+        "poi_unity_id": "b328d86f-541a-4148-b82c-e4fc2a5939ea",
         "source_ref": "corpus_simulasi.py#faq_rekam_medis",
         "content": (
             "Permintaan salinan rekam medis, fotokopi hasil pemeriksaan, hasil lab, "
-            "atau resume medis diajukan di bagian Rekam Medis Lantai 1 dengan membawa "
+            "atau resume medis diajukan di bagian Administrasi / Rekam Medis Lantai 1 dengan membawa "
             "KTP pasien. Permintaan oleh keluarga memerlukan surat kuasa. Berkas "
             "selesai dalam 3 hari kerja."
         ),
     },
-
-    # ── Perluasan corpus (tahap 2) ────────────────────────────────────────────
-    # Ditulis untuk menutup topik yang lazim ditanyakan di RS tapi belum terwakili,
-    # bukan sekadar mengejar soal uji yang gagal. Kosakatanya sengaja memakai
-    # istilah awam sekaligus istilah resmi, karena pasien memakai keduanya.
     {
         "title": "Kasir dan Cara Pembayaran",
         "doc_type": "layanan",
         "floor": "Lantai 1",
         "building": "RS Islam Ahmad Yani",
-        "poi_unity_id": None,
+        "poi_unity_id": "b328d86f-541a-4148-b82c-e4fc2a5939ea",
         "source_ref": "corpus_simulasi.py#kasir",
         "content": (
-            "Kasir melayani pembayaran biaya pemeriksaan, obat, dan tindakan. "
-            "Pembayaran bisa tunai, kartu debit, kartu kredit, dan QRIS. Pasien umum "
-            "membayar setelah pemeriksaan selesai. Pasien BPJS tidak membayar biaya "
-            "yang ditanggung, tetapi selisih biaya naik kelas dibayar di Kasir. "
-            "Kuitansi diminta di loket yang sama."
+            "Loket Kasir melayani pembayaran biaya pemeriksaan dokter, obat farmasi, dan tindakan medis. "
+            "Pembayaran bisa dilakukan secara tunai, kartu debit, kartu kredit, dan QRIS. Pasien umum "
+            "membayar setelah pemeriksaan selesai. Loket Kasir berada di Lantai 1 dekat loket Pendaftaran."
         ),
     },
     {
@@ -237,11 +240,8 @@ CHUNKS: list[dict] = [
         "poi_unity_id": None,
         "source_ref": "corpus_simulasi.py#rawat_inap",
         "content": (
-            "Rawat inap atau opname tersedia dalam kelas 3, kelas 2, kelas 1, dan VIP. "
-            "Pasien BPJS mendapat kelas sesuai haknya dan boleh naik kelas dengan "
-            "membayar selisih. Pendaftaran rawat inap diurus di Admisi setelah dokter "
-            "menyatakan pasien perlu menginap. Satu penunggu pasien diperbolehkan "
-            "menginap di kamar."
+            "Rawat inap atau opname tersedia dalam kelas 3, kelas 2, kelas 1, dan VIP di Lantai 2. "
+            "Pendaftaran rawat inap diurus di bagian Admisi setelah dokter menyatakan pasien perlu menginap."
         ),
     },
     {
@@ -252,7 +252,7 @@ CHUNKS: list[dict] = [
         "poi_unity_id": None,
         "source_ref": "corpus_simulasi.py#poli_gigi",
         "content": (
-            "Poli Gigi melayani sakit gigi, gigi berlubang, tambal gigi, cabut gigi, "
+            "Poli Gigi berada di Lantai 2 melayani sakit gigi, gigi berlubang, tambal gigi, cabut gigi, "
             "pembersihan karang gigi, dan pemasangan gigi palsu. Tindakan cabut gigi "
             "tidak dilakukan saat gusi sedang bengkak dan meradang."
         ),
@@ -265,9 +265,8 @@ CHUNKS: list[dict] = [
         "poi_unity_id": None,
         "source_ref": "corpus_simulasi.py#poli_mata",
         "content": (
-            "Poli Mata melayani pemeriksaan mata, keluhan mata merah, mata gatal, "
-            "penglihatan kabur, minus, plus, silinder, pemeriksaan katarak, dan "
-            "pembuatan resep kacamata."
+            "Poli Mata berada di Lantai 2 melayani pemeriksaan mata, keluhan mata merah, mata gatal, "
+            "penglihatan kabur, rabun jauh/dekat, katarak, dan pembuatan resep kacamata."
         ),
     },
     {
@@ -278,25 +277,57 @@ CHUNKS: list[dict] = [
         "poi_unity_id": None,
         "source_ref": "corpus_simulasi.py#poli_obgyn",
         "content": (
-            "Poli Kandungan dan Kebidanan melayani pemeriksaan kehamilan, kontrol "
+            "Poli Kandungan dan Kebidanan berada di Lantai 2 melayani pemeriksaan kehamilan, kontrol "
             "rutin ibu hamil, USG kandungan, keluhan haid, keputihan, program hamil, "
-            "dan konsultasi keluarga berencana atau KB, termasuk pemasangan dan pelepasan "
-            "spiral atau IUD, susuk atau implan, suntik KB, dan pil KB. Ibu yang akan melahirkan "
-            "ditangani di Ruang Bersalin, bukan di poli."
+            "dan konsultasi keluarga berencana (KB). Ibu yang akan melahirkan ditangani di Ruang Bersalin."
         ),
     },
     {
-        "title": "Area Parkir",
+        "title": "Area Parkir Mobil",
         "doc_type": "layanan",
         "floor": "Ground",
         "building": "RS Islam Ahmad Yani",
-        "poi_unity_id": None,
-        "source_ref": "corpus_simulasi.py#parkir",
+        "poi_unity_id": "58139f04-3ca8-4f9c-87b7-f0a9887ed0de",
+        "source_ref": "corpus_simulasi.py#parkir_mobil",
         "content": (
-            "Area parkir kendaraan pengunjung tersedia untuk mobil dan sepeda motor, "
-            "terletak di area depan dan samping gedung. Karcis parkir diambil di pintu "
-            "masuk dan dibayar saat keluar. Parkir khusus karyawan terpisah dari parkir "
-            "pengunjung."
+            "Area Parkir Mobil berada di area Ground / pelataran depan rumah sakit untuk kendaraan roda empat "
+            "pengunjung dan pasien. Karcis parkir mobil diambil di pintu gerbang masuk."
+        ),
+    },
+    {
+        "title": "Area Parkir Sepeda Motor",
+        "doc_type": "layanan",
+        "floor": "Ground",
+        "building": "RS Islam Ahmad Yani",
+        "poi_unity_id": "e42f1d1f-5b4d-45a5-93e4-07e88a6a6618",
+        "source_ref": "corpus_simulasi.py#parkir_motor",
+        "content": (
+            "Area Parkir Motor Karyawan dan Pengunjung berada di sisi samping area Ground untuk kendaraan roda dua. "
+            "Harap kunci ganda sepeda motor Anda."
+        ),
+    },
+    {
+        "title": "Fasilitas Lift dan Elevator",
+        "doc_type": "layanan",
+        "floor": "Lantai 1",
+        "building": "RS Islam Ahmad Yani",
+        "poi_unity_id": "d52a7a82-ce07-47d3-a5ba-d2b07c678a0c",
+        "source_ref": "corpus_simulasi.py#lift",
+        "content": (
+            "Fasilitas Lift / Elevator tersedia untuk akses cepat antara Lantai 1 (Ground) dan Lantai 2. "
+            "Lift diprioritaskan untuk pasien berkursi roda, brankar/tandu, lansia, dan ibu hamil."
+        ),
+    },
+    {
+        "title": "Lobi Utama dan Informasi",
+        "doc_type": "layanan",
+        "floor": "Ground",
+        "building": "RS Islam Ahmad Yani",
+        "poi_unity_id": "eb8f0e33-2832-484e-862a-c123b2259b05",
+        "source_ref": "corpus_simulasi.py#lobi",
+        "content": (
+            "Lobi Utama dan pintu masuk rumah sakit berada di lantai Ground. Tempat drop off pasien, "
+            "meja resepsionis, dan petugas keamanan siap membantu mengarahkan pengunjung."
         ),
     },
     {
@@ -308,9 +339,7 @@ CHUNKS: list[dict] = [
         "source_ref": "corpus_simulasi.py#kantin",
         "content": (
             "Kantin menyediakan makanan dan minuman untuk pengunjung serta keluarga "
-            "pasien, buka pukul 06.00 sampai 21.00. Makanan pasien rawat inap diatur "
-            "terpisah oleh Instalasi Gizi sesuai diet yang ditentukan dokter, jadi "
-            "keluarga sebaiknya tidak membawakan makanan dari luar tanpa izin perawat."
+            "pasien di Lantai 1, buka pukul 06.00 sampai 21.00 WIB."
         ),
     },
     {
@@ -321,9 +350,7 @@ CHUNKS: list[dict] = [
         "poi_unity_id": None,
         "source_ref": "corpus_simulasi.py#atm",
         "content": (
-            "Mesin ATM tersedia di Lantai 1 dekat lobi utama untuk tarik tunai dan "
-            "transfer. Tersedia beberapa bank. Kalau ATM sedang gangguan, pembayaran "
-            "di Kasir tetap bisa memakai kartu debit atau QRIS."
+            "Mesin ATM Center tersedia di Lantai 1 dekat lobi utama untuk tarik tunai dan transfer berbagai bank."
         ),
     },
     {
@@ -331,57 +358,22 @@ CHUNKS: list[dict] = [
         "doc_type": "layanan",
         "floor": "Lantai 1",
         "building": "RS Islam Ahmad Yani",
-        "poi_unity_id": None,
+        "poi_unity_id": "033e7541-05e9-4726-bc84-0825c5d12e10",
         "source_ref": "corpus_simulasi.py#ambulans",
         "content": (
-            "Layanan ambulans tersedia 24 jam. Mobil ambulans dipakai untuk menjemput "
-            "pasien dari rumah, mengantar pasien pulang, rujukan antar "
-            "rumah sakit, dan mengantar jenazah. Permintaan ambulans diajukan lewat "
-            "IGD atau bagian Informasi. Biaya ambulans dihitung berdasarkan jarak "
-            "tempuh."
+            "Layanan ambulans gawat darurat tersedia 24 jam di unit IGD Lantai 1 untuk jemput pasien darurat atau rujukan."
         ),
     },
     {
-        "title": "Fisioterapi dan Rehabilitasi Medik",
+        "title": "Fasilitas Toilet dan Kamar Mandi",
         "doc_type": "layanan",
         "floor": "Lantai 1",
         "building": "RS Islam Ahmad Yani",
-        "poi_unity_id": None,
-        "source_ref": "corpus_simulasi.py#fisio",
+        "poi_unity_id": "dc295a0d-434d-4c41-9728-5bd9f8a0fb0b",
+        "source_ref": "corpus_simulasi.py#toilet",
         "content": (
-            "Fisioterapi atau rehabilitasi medik melayani terapi pasca patah tulang, "
-            "nyeri punggung, nyeri lutut, kaku sendi, pemulihan pasca stroke, dan "
-            "latihan jalan. Terapi dijadwalkan beberapa kali pertemuan dan memerlukan "
-            "surat pengantar dari dokter."
-        ),
-    },
-    {
-        "title": "Medical Check Up dan Surat Keterangan Sehat",
-        "doc_type": "layanan",
-        "floor": "Lantai 1",
-        "building": "RS Islam Ahmad Yani",
-        "poi_unity_id": None,
-        "source_ref": "corpus_simulasi.py#mcu",
-        "content": (
-            "Medical check up melayani pemeriksaan kesehatan berkala, syarat melamar "
-            "kerja, syarat sekolah, dan syarat perjalanan. Surat keterangan sehat dan "
-            "surat keterangan sakit, yang juga disebut surat izin sakit atau surat izin "
-            "tidak masuk kerja dan sekolah, diterbitkan setelah pemeriksaan dokter. Pemeriksaan "
-            "MCU sebaiknya dilakukan pagi hari dalam kondisi puasa."
-        ),
-    },
-    {
-        "title": "Informasi dan Cara Membuat Janji Temu",
-        "doc_type": "layanan",
-        "floor": "Lantai 1",
-        "building": "RS Islam Ahmad Yani",
-        "poi_unity_id": None,
-        "source_ref": "corpus_simulasi.py#janji",
-        "content": (
-            "Bagian Informasi di lobi Lantai 1 membantu pertanyaan umum, penunjuk arah, "
-            "dan pendaftaran janji temu dengan dokter. Janji temu bisa dibuat langsung "
-            "di loket atau lewat telepon pada jam kerja. Pasien yang sudah punya janji "
-            "tetap perlu mendaftar ulang di loket sebelum masuk poli."
+            "Fasilitas Toilet dan Kamar Mandi umum tersedia di Lantai 1 (dekat lobi dan musholla) serta di Lantai 2. "
+            "Digunakan untuk buang air kecil, buang air besar (BAB), cuci tangan, dan sanitasi pengunjung (pria, wanita, difabel)."
         ),
     },
 ]

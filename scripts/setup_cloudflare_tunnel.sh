@@ -16,8 +16,8 @@ echo "======================================================"
 if ! command -v cloudflared &> /dev/null; then
     echo "[1/4] Menginstal cloudflared..."
     ARCH=$(dpkg --print-architecture 2>/dev/null || echo "amd64")
-    curl -fsSL -o cloudflared.deb "https://github.com/cloudflare/cloudflare-tunnel-remote/releases/latest/download/cloudflared-linux-${ARCH}.deb" || \
-    curl -fsSL -o cloudflared.deb "https://pkg.cloudflare.com/cloudflared-ascii/cloudflared-linux-${ARCH}.deb"
+    curl -fsSL -o cloudflared.deb "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${ARCH}.deb" || \
+    curl -fsSL -o cloudflared.deb "https://pkg.cloudflare.com/cloudflared-linux-${ARCH}.deb"
     
     sudo dpkg -i cloudflared.deb || sudo apt-get install -f -y
     rm -f cloudflared.deb

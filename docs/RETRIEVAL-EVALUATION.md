@@ -219,3 +219,38 @@ python -m scripts.eval_retrieval
 
 Postgres lokal harus memakai image `pgvector/pgvector:pg16`, bukan `postgres:16`
 polos, karena ekstensi `vector` tidak ada di image polos.
+
+---
+
+## 11. Evaluasi End-to-End: LLM-as-a-Judge Benchmark Suite (2026-08-22)
+
+Untuk melengkapi pengukuran retrieval di atas, dibangun evaluasi end-to-end dengan metode **LLM-as-a-Judge** (`scripts/eval_llm_judge.py`) yang menguji respons akhir asisten RAG di seluruh spektrum kasus rumah sakit.
+
+### Hasil Pengujian (52 Skenario)
+* **Model Generator:** Groq (`openai/gpt-oss-20b`)
+* **Model Judge:** Groq (`openai/gpt-oss-20b`)
+* **Tingkat Kelulusan:** **52 / 52 Passed (100.0%)**
+
+| Kategori Skenario | Kasus Diuji | Hasil | Fokus Evaluasi |
+|---|---|---|---|
+| **Gawat Darurat & Trauma** | 10 | 10/10 (100%) | Wajib triase ke **IGD**, anti-salah arah ke parkir motor/loket antre |
+| **Poliklinik & Jadwal Dokter** | 10 | 10/10 (100%) | Lookup jadwal dokter & rujukan lantai poli (Poli Anak, Dalam, Obgyn, Gigi, Mata) |
+| **Layanan Farmasi & Obat** | 6 | 6/6 (100%) | Tebus resep BPJS/Umum, jam buka apotek, obat racikan |
+| **Diagnostik & Penunjang** | 6 | 6/6 (100%) | Rontgen dada (Ruang X-Ray), USG puasa, CT-Scan (Radiologi), cek darah (Lab) |
+| **Administrasi & Pembayaran** | 6 | 6/6 (100%) | Loket BPJS, Kasir QRIS, Rekam Medis, pendaftaran tanpa rujukan |
+| **Fasilitas Umum & Spasial** | 10 | 10/10 (100%) | Bahasa gaul (kebelet kencing -> Toilet), Musholla, Lift, Parkir Mobil/Motor, Lobi |
+| **Out-of-Scope / Chitchat** | 4 | 4/4 (100%) | Penolakan santun & tegas tanpa halusinasi |
+
+### Cara Menjalankan LLM-as-a-Judge Benchmark
+
+```bash
+# Menjalankan terhadap live HTTP API
+export TARGET_URL="https://<tunnel-url>.trycloudflare.com"
+export GROQ_API_KEY="gsk_..."
+python -m scripts.eval_llm_judge
+
+# Atau menjalankan langsung terhadap database PostgreSQL lokal
+export DATABASE_URL="postgresql://postgres:darsi@localhost:5433/darsi"
+export GROQ_API_KEY="gsk_..."
+python -m scripts.eval_llm_judge
+```
