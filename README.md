@@ -65,10 +65,14 @@ Di situ ada bukti terukur bahwa kemiripan cosine tidak bisa dipakai menyaring
 pertanyaan di luar cakupan, dan kenapa migrasi ke model embedding yang lebih besar
 sudah diuji lalu dibatalkan.
 
-### Catatan deployment
+### Catatan Deployment & Ingress (ADR-027)
 Dependensi ONNX + bobot model menambah sekitar 450-500MB. Model dimuat sekali saat
-startup lewat `lifespan`. Kalau pemakaian memori Railway melewati batas paket, itu
-keputusan biaya yang perlu dibicarakan, bukan diakali dengan menurunkan kualitas model.
+startup lewat `lifespan`.
+
+**Opsi Hosting & Ingress:**
+1. **Server Privat (di balik VPN/Firewall):** Gunakan **Cloudflare Tunnel (`cloudflared`)** sebagai Zero Trust application connector. Menyediakan HTTPS publik otomatis tanpa membuka inbound port dan tanpa mewajibkan OpenVPN di HP klien.
+2. **Managed Cloud (100% Free):** Database di **Supabase** (Postgres 16 + `pgvector`), web service di **Koyeb / Render / Fly.io** (auto-deploy GitHub).
+3. **Local Dev & Testing:** Jalankan via Docker (`pgvector/pgvector:pg16`), uji via Android USB menggunakan `adb reverse tcp:8000 tcp:8000`.
 
 
 ## Files
@@ -80,14 +84,34 @@ keputusan biaya yang perlu dibicarakan, bukan diakali dengan menurunkan kualitas
 - `app/main.py` — FastAPI service (sync psycopg + sync endpoints; runs in a threadpool)
 - `requirements.txt`
 
-## Run (dev)
+## Run with Docker Compose (Recommended)
+
+```bash
+# 1. Setup konfigurasi env
+cp .env.docker.example .env
+# Edit .env dan isi GROQ_API_KEY Anda
+
+# 2. Build & jalankan container
+docker compose up -d --build
+
+# 3. Ingest corpus simulasi ke database pgvector
+docker compose exec api python -m scripts.ingest_corpus
+
+# 4. Check endpoint
+curl http://localhost:8000/api/poi/popular
+```
+
+Panduan lengkap menghubungkan server privat ke internet via Cloudflare Tunnel: [`docs/TUNNEL-SETUP.md`](docs/TUNNEL-SETUP.md).
+
+## Run Manually (Local Python)
 ```bash
 # 1. DB: Supabase Postgres OR a local Postgres (e.g. Docker)
-#    docker run -d --name darsi-pg -e POSTGRES_PASSWORD=darsi -e POSTGRES_DB=darsi -p 5433:5432 postgres:16
+#    docker run -d --name darsi-pg -e POSTGRES_PASSWORD=darsi -e POSTGRES_DB=darsi -p 5433:5432 pgvector/pgvector:pg16
 cp .env.example .env          # then edit DATABASE_URL
 export DATABASE_URL="postgresql://postgres:darsi@localhost:5433/darsi"
 psql "$DATABASE_URL" -f schema.sql
-# TIDAK ada seed — isi POI dari Unity: menu DARSI > Sync POIs to Backend
+psql "$DATABASE_URL" -f schema_rag.sql
+python -m scripts.ingest_corpus
 
 # 2. API
 python -m venv .venv && . .venv/Scripts/activate   # (Windows: .venv\Scripts\activate)
