@@ -9,8 +9,12 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-darsi}
       POSTGRES_DB: ${POSTGRES_DB:-darsi}
+    # Dibatasi ke 127.0.0.1 -- "Zero Open Inbound Ports" (ADR-027), pola sama
+    # yang sebelumnya dipakai untuk service ollama. api tidak butuh port host
+    # ini sama sekali (connect lewat network Docker internal "db:5432"); ini
+    # cuma buat debug manual dari server itu sendiri (psql/SSH tunnel).
     ports:
-      - "${DB_PORT:-5433}:5432"
+      - "127.0.0.1:${DB_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
