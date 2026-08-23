@@ -42,41 +42,34 @@ psql "$DATABASE_URL" -f schema_rag.sql   # butuh ekstensi pgvector
 python -m scripts.ingest_corpus
 ```
 
-**LLM: Qwen lokal (Ollama) primer, Groq fallback.** Peran ini terbalik dari
-`OllamaConnector.cs` di repo Unity (ADR-024) dengan alasan yang tepat: di sana
-Ollama LAN developer tak terjangkau dari lapangan, jadi jadi fallback. Di sini
-Ollama jalan satu Docker network dengan `api` (lihat `docker-compose.yml`),
-selalu terjangkau, gratis, tanpa API key. Groq jadi jaring pengaman kalau Qwen
-gagal/timeout.
+**LLM: Bifrost (medgemma) primer, Groq fallback.** Rencana sebelumnya (Qwen
+lokal via Ollama di `vm-amma`) DIBATALKAN — `vm-amma` terverifikasi (`lspci`)
+tidak punya GPU sama sekali, 2 vCPU, jadi 7B CPU-only akan selalu timeout dan
+jatuh ke Groq. Bifrost adalah gateway OpenAI-compatible yang di-host TERPISAH
+(hcm-lab.id, GPU sungguhan, dikelola tim PSDKU/HCM Lab) — bukan service di
+`docker-compose.yml` ini, jadi tidak butuh GPU di server backend sama sekali.
+Modelnya (`medgemma-1.5-4b-it-q4`) di-tuning domain medis, relevan untuk
+asisten RS dibanding Groq yang general-purpose.
 
-### Setup Qwen lokal (Ollama)
+### Setup Bifrost
 
-Ollama-nya ikut naik otomatis lewat `docker-compose up`, tapi **menarik model
-adalah langkah manual sekali jalan** (image `ollama/ollama` tidak membawa model
-apa pun secara default):
+Tidak ada service tambahan untuk dinaikkan — cukup set env var, tidak perlu
+`docker compose up` service baru maupun langkah pull model manual:
 
 ```bash
-docker compose up -d
-docker exec darsi-ollama ollama pull qwen2.5:7b
+BIFROST_API_KEY=sk-bf-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 ```
 
-Butuh GPU NVIDIA + `nvidia-container-toolkit` terpasang di host supaya
-`deploy.resources.reservations.devices` di compose bisa memberi akses GPU ke
-kontainer. Tanpa itu Ollama tetap jalan tapi di CPU (jauh lebih lambat).
+Auth-nya pakai header `x-api-key`, BUKAN `Authorization: Bearer` seperti Groq
+— formatnya memang beda per gateway ini, sudah ditangani di `_try_bifrost()`.
 
-Verifikasi manual dari server itu sendiri (port di-bind ke `127.0.0.1` saja,
-**tidak dipublikasikan** — menjaga prinsip "Zero Open Inbound Ports" ADR-027):
-```bash
-curl localhost:11434/api/tags   # daftar model yang sudah tertarik
-```
-
-Kalau model belum tertarik, endpoint asisten tetap berfungsi lewat fallback
-Groq sampai `ollama pull` dijalankan — lihat `generation.prewarm_ollama()` dan
-mode kegagalan di spec §8.3.
+**Jangan pernah commit `BIFROST_API_KEY` sungguhan** — isi hanya di `.env`
+lokal/gitignored atau secret manager di server, sama seperti pola
+`groq-api-key.local.txt` di repo Unity (ADR-024).
 
 Env var tambahan: `GROQ_API_KEY` (dipanggil dari server, tidak pernah ikut ke
-APK; boleh kosong tapi endpoint jadi rentan kalau Qwen juga gagal),
-`OLLAMA_URL`/`OLLAMA_MODEL` (opsional, default sudah benar untuk docker-compose).
+APK; boleh kosong tapi endpoint jadi rentan kalau Bifrost juga gagal),
+`BIFROST_URL`/`BIFROST_MODEL` (opsional, default sudah benar).
 
 ### Evaluasi retrieval
 ```bash

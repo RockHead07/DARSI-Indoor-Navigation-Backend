@@ -74,23 +74,22 @@ async def lifespan(app: FastAPI):
     )
     app.state.pool.open()
 
-    # Groq sekarang FALLBACK, bukan wajib -- Qwen lokal (Ollama) jadi provider
-    # UTAMA (lihat app/assistant/generation.py). Kosongnya bukan lagi fatal di
-    # startup, cuma peringatan: endpoint asisten tetap bisa berfungsi penuh lewat
-    # Qwen saja, dan baru terasa kalau Qwen JUGA gagal saat itu (503 per-request).
+    # Bifrost (medgemma, gateway eksternal) adalah provider UTAMA, Groq FALLBACK
+    # (lihat app/assistant/generation.py). Kosongnya salah satu bukan fatal di
+    # startup, cuma peringatan -- endpoint baru gagal (503) kalau DUA-DUANYA
+    # kosong/gagal saat request sungguhan.
+    if not os.environ.get("BIFROST_API_KEY", ""):
+        print("[startup] PERINGATAN: BIFROST_API_KEY kosong -- provider LLM "
+              "utama tidak akan berfungsi, langsung jatuh ke Groq fallback.")
     if not os.environ.get("GROQ_API_KEY", ""):
         print("[startup] PERINGATAN: GROQ_API_KEY kosong -- fallback LLM tidak "
-              "akan berfungsi kalau Ollama gagal.")
+              "akan berfungsi kalau Bifrost gagal.")
 
     # Muat model embedding sekali di startup, bukan per-request. Tanpa ini request
-    # pertama akan lambat seperti gejala pre-warm Ollama di repo Unity. Kalau bobot
-    # model gagal dimuat, exception di sini menggagalkan startup — itu memang yang
-    # diinginkan, daripada service hidup tanpa kemampuan retrieval.
+    # pertama akan lambat. Kalau bobot model gagal dimuat, exception di sini
+    # menggagalkan startup — itu memang yang diinginkan, daripada service hidup
+    # tanpa kemampuan retrieval.
     embedding.load_model()
-
-    # Best-effort, TIDAK menggagalkan startup kalau Ollama belum siap (image masih
-    # ditarik, atau model qwen2.5:7b belum ditarik manual -- lihat README).
-    generation.prewarm_ollama()
 
     try:
         yield

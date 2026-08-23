@@ -1,15 +1,18 @@
-"""Susun prompt lalu panggil LLM: Qwen lokal (Ollama) primer, Groq fallback.
+"""Susun prompt lalu panggil LLM: Bifrost (medgemma, GPU eksternal) primer, Groq fallback.
 
-Peran ini TERBALIK dari pola OllamaConnector.cs di repo Unity (ADR-024, Groq
-primer/Ollama fallback) -- dan itu memang benar, bukan inkonsistensi. Di sana
-Ollama LAN developer tidak terjangkau dari lapangan, jadi harus jadi fallback.
-Di sini Ollama jalan satu Docker network dengan backend ini sendiri (lihat
-docker-compose.yml), selalu terjangkau, gratis, dan tanpa API key. Groq jadi
-jaring pengaman kalau Qwen gagal/timeout/model belum tertarik.
+Rencana sebelumnya (Qwen lokal via Ollama di server `vm-amma`) DIBATALKAN --
+`vm-amma` terverifikasi (lspci) TIDAK punya GPU sama sekali, cuma 2 vCPU, jadi
+inferensi 7B CPU-only akan selalu timeout dan jatuh ke Groq. Lihat memori
+`vm-amma-no-gpu-pending-decision`.
+
+Bifrost adalah gateway OpenAI-compatible yang di-host TERPISAH (hcm-lab.id,
+GPU sungguhan, dikelola tim PSDKU/HCM), bukan service di docker-compose ini --
+jadi tidak butuh GPU di `vm-amma` sama sekali. Modelnya (medgemma) di-tuning
+domain medis, relevan untuk asisten RS dibanding Groq yang general-purpose.
 
 Groq tetap dipanggil dari SERVER, bukan dari APK -- ini menutup utang keamanan
 yang tercatat di OllamaConnector.cs (key ikut ter-bundle ke APK kalau dipanggil
-dari client).
+dari client). Prinsip yang sama berlaku untuk BIFROST_API_KEY.
 """
 
 import os
@@ -18,14 +21,17 @@ import httpx
 
 from app.assistant.models import RetrievedChunk, ScheduleRow
 
-# Qwen lokal via Ollama (OpenAI-compatible endpoint). URL-nya nama service Docker
-# ("ollama"), BUKAN localhost -- localhost di dalam kontainer api adalah kontainer
-# itu sendiri, bukan host tempat Ollama jalan.
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://ollama:11434").rstrip("/") + "/v1/chat/completions"
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:7b")
-# Lebih longgar dari Groq: request pertama setelah container idle bisa kena cold
-# load ke VRAM. Pre-warm di startup (lihat prewarm_ollama) biasanya menghindari ini.
-OLLAMA_TIMEOUT_SECONDS = 30
+# Bifrost: gateway eksternal (bukan service Docker lokal), auth via header
+# "x-api-key" (bukan "Authorization: Bearer" seperti Groq -- format gateway ini
+# memang beda, dikonfirmasi dari contoh curl yang diberikan tim HCM Lab).
+BIFROST_URL = os.environ.get("BIFROST_URL", "https://bifrost.hcm-lab.id/v1/chat/completions")
+# medgemma menghasilkan reasoning trace panjang sebelum "content" (terukur
+# langsung: prompt realistis satu chunk = 14.7 detik, "Halo AI!" saja = 9.3
+# detik). 20 detik (nilai lama Groq) terlalu mepet kalau chunk+jadwal lebih
+# banyak; 30 detik ngasih ruang tanpa bikin user menunggu lama saat jatuh ke
+# Groq (fallback tetap kena kalau Bifrost benar-benar mati/timeout).
+BIFROST_MODEL = os.environ.get("BIFROST_MODEL", "llama.cpp/medgemma-1.5-4b-it-q4")
+BIFROST_TIMEOUT_SECONDS = 30
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 # Sama dengan yang dipakai OllamaConnector.cs. llama-3.1-8b-instant dihentikan Groq
@@ -88,29 +94,34 @@ def build_prompt(
 
 
 def generate_answer(prompt: str) -> str:
-    """Coba Qwen lokal dulu, Groq kalau gagal. Melempar RuntimeError hanya kalau
-    DUA-DUANYA gagal, biar penanganannya (503) tetap di router seperti sebelumnya.
+    """Coba Bifrost (medgemma) dulu, Groq kalau gagal. Melempar RuntimeError hanya
+    kalau DUA-DUANYA gagal, biar penanganannya (503) tetap di router seperti sebelumnya.
     """
     try:
-        return _try_ollama(prompt)
-    except Exception as e_ollama:
+        return _try_bifrost(prompt)
+    except Exception as e_bifrost:
         try:
             return _try_groq(prompt)
         except Exception as e_groq:
             raise RuntimeError(
-                f"Ollama gagal ({e_ollama}) dan Groq fallback juga gagal ({e_groq})"
+                f"Bifrost gagal ({e_bifrost}) dan Groq fallback juga gagal ({e_groq})"
             ) from e_groq
 
 
-def _try_ollama(prompt: str) -> str:
+def _try_bifrost(prompt: str) -> str:
+    api_key = os.environ.get("BIFROST_API_KEY", "")
+    if not api_key:
+        raise RuntimeError("BIFROST_API_KEY kosong")
+
     resp = httpx.post(
-        OLLAMA_URL,
+        BIFROST_URL,
+        headers={"x-api-key": api_key},
         json={
-            "model": OLLAMA_MODEL,
+            "model": BIFROST_MODEL,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.2,
         },
-        timeout=OLLAMA_TIMEOUT_SECONDS,
+        timeout=BIFROST_TIMEOUT_SECONDS,
     )
     resp.raise_for_status()
     return resp.json()["choices"][0]["message"]["content"].strip()
@@ -133,27 +144,3 @@ def _try_groq(prompt: str) -> str:
     )
     resp.raise_for_status()
     return resp.json()["choices"][0]["message"]["content"].strip()
-
-
-def prewarm_ollama() -> None:
-    """Panggilan dummy di startup biar Qwen sudah termuat ke VRAM sebelum request
-    pertama sungguhan (pola sama seperti OllamaConnector.PreWarmModel di Unity).
-
-    Best-effort, TIDAK melempar exception. Ollama mungkin masih menarik image
-    container atau modelnya belum ditarik manual (langkah sekali jalan, lihat
-    README) -- itu bukan alasan menggagalkan startup service, karena Groq
-    fallback tetap menutupi sampai Qwen siap.
-    """
-    try:
-        httpx.post(
-            OLLAMA_URL,
-            json={
-                "model": OLLAMA_MODEL,
-                "messages": [{"role": "user", "content": "hi"}],
-                "temperature": 0,
-            },
-            timeout=OLLAMA_TIMEOUT_SECONDS,
-        )
-        print(f"[startup] Ollama ({OLLAMA_MODEL}) siap.")
-    except Exception as e:
-        print(f"[startup] Ollama pre-warm gagal ({e}). Groq fallback dipakai sampai Qwen siap.")

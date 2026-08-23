@@ -21,33 +21,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Qwen lokal, primer untuk generation (lihat app/assistant/generation.py). Jalan
-  # sebagai service di network Docker yang SAMA dengan api, bukan di host langsung --
-  # itu sebabnya api bisa memanggilnya lewat "http://ollama:11434", bukan localhost
-  # (localhost di dalam kontainer api adalah kontainer itu sendiri, bukan host).
-  #
-  # Port host cuma di-bind ke 127.0.0.1, TIDAK dipublikasikan ke jaringan/internet --
-  # menjaga prinsip "Zero Open Inbound Ports" ADR-027. Dipakai buat debug manual dari
-  # server itu sendiri (curl localhost:11434), bukan buat diakses dari luar.
-  #
-  # Model TIDAK otomatis tertarik saat container pertama nyala -- itu langkah manual
-  # sekali jalan, lihat README bagian "Setup Qwen lokal (Ollama)".
-  ollama:
-    image: ollama/ollama:latest
-    container_name: darsi-ollama
-    restart: unless-stopped
-    volumes:
-      - ollama_data:/root/.ollama
-    ports:
-      - "127.0.0.1:11434:11434"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-
   api:
     build:
       context: .
@@ -57,16 +30,15 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      ollama:
-        condition: service_started
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-darsi}@db:5432/${POSTGRES_DB:-darsi}
       POI_SYNC_TOKEN: ${POI_SYNC_TOKEN:-darsi-admin-token}
-      # Groq sekarang FALLBACK, bukan wajib -- lihat generation.py. Kosong tetap
-      # boleh, tapi endpoint asisten jadi rentan kalau Ollama juga gagal.
+      # Bifrost = provider LLM UTAMA, gateway eksternal (hcm-lab.id) -- BUKAN
+      # service di compose ini, jadi tidak butuh GPU di host ini. Groq FALLBACK,
+      # dua-duanya boleh kosong secara individual tapi endpoint jadi rentan kalau
+      # keduanya kosong/gagal bersamaan. Lihat generation.py.
+      BIFROST_API_KEY: ${BIFROST_API_KEY}
       GROQ_API_KEY: ${GROQ_API_KEY}
-      OLLAMA_URL: http://ollama:11434
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:7b}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
     ports:
       - "${API_PORT:-8000}:8000"
@@ -76,4 +48,3 @@ services:
 volumes:
   pgdata:
   fastembed_cache:
-  ollama_data:
