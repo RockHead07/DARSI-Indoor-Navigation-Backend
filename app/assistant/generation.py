@@ -1,9 +1,15 @@
-"""Susun prompt lalu panggil Groq.
+"""Susun prompt lalu panggil LLM: Qwen lokal (Ollama) primer, Groq fallback.
 
-Groq dipanggil dari SERVER, bukan dari APK. Ini menutup utang keamanan yang sudah
-tercatat di Assets/Speech Recognition/OllamaConnector.cs di repo Unity: kalau
-dipanggil dari client, groqApiKey ikut ter-bundle ke APK dan bisa diekstrak
-siapa pun yang men-decompile-nya.
+Peran ini TERBALIK dari pola OllamaConnector.cs di repo Unity (ADR-024, Groq
+primer/Ollama fallback) -- dan itu memang benar, bukan inkonsistensi. Di sana
+Ollama LAN developer tidak terjangkau dari lapangan, jadi harus jadi fallback.
+Di sini Ollama jalan satu Docker network dengan backend ini sendiri (lihat
+docker-compose.yml), selalu terjangkau, gratis, dan tanpa API key. Groq jadi
+jaring pengaman kalau Qwen gagal/timeout/model belum tertarik.
+
+Groq tetap dipanggil dari SERVER, bukan dari APK -- ini menutup utang keamanan
+yang tercatat di OllamaConnector.cs (key ikut ter-bundle ke APK kalau dipanggil
+dari client).
 """
 
 import os
@@ -11,6 +17,15 @@ import os
 import httpx
 
 from app.assistant.models import RetrievedChunk, ScheduleRow
+
+# Qwen lokal via Ollama (OpenAI-compatible endpoint). URL-nya nama service Docker
+# ("ollama"), BUKAN localhost -- localhost di dalam kontainer api adalah kontainer
+# itu sendiri, bukan host tempat Ollama jalan.
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://ollama:11434").rstrip("/") + "/v1/chat/completions"
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:7b")
+# Lebih longgar dari Groq: request pertama setelah container idle bisa kena cold
+# load ke VRAM. Pre-warm di startup (lihat prewarm_ollama) biasanya menghindari ini.
+OLLAMA_TIMEOUT_SECONDS = 30
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 # Sama dengan yang dipakai OllamaConnector.cs. llama-3.1-8b-instant dihentikan Groq
@@ -73,23 +88,72 @@ def build_prompt(
 
 
 def generate_answer(prompt: str) -> str:
-    """Panggil Groq. Melempar RuntimeError kalau gagal, biar penanganannya di router."""
+    """Coba Qwen lokal dulu, Groq kalau gagal. Melempar RuntimeError hanya kalau
+    DUA-DUANYA gagal, biar penanganannya (503) tetap di router seperti sebelumnya.
+    """
+    try:
+        return _try_ollama(prompt)
+    except Exception as e_ollama:
+        try:
+            return _try_groq(prompt)
+        except Exception as e_groq:
+            raise RuntimeError(
+                f"Ollama gagal ({e_ollama}) dan Groq fallback juga gagal ({e_groq})"
+            ) from e_groq
+
+
+def _try_ollama(prompt: str) -> str:
+    resp = httpx.post(
+        OLLAMA_URL,
+        json={
+            "model": OLLAMA_MODEL,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.2,
+        },
+        timeout=OLLAMA_TIMEOUT_SECONDS,
+    )
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"].strip()
+
+
+def _try_groq(prompt: str) -> str:
     api_key = os.environ.get("GROQ_API_KEY", "")
     if not api_key:
         raise RuntimeError("GROQ_API_KEY kosong")
 
+    resp = httpx.post(
+        GROQ_URL,
+        headers={"Authorization": f"Bearer {api_key}"},
+        json={
+            "model": GROQ_MODEL,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.2,
+        },
+        timeout=GROQ_TIMEOUT_SECONDS,
+    )
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"].strip()
+
+
+def prewarm_ollama() -> None:
+    """Panggilan dummy di startup biar Qwen sudah termuat ke VRAM sebelum request
+    pertama sungguhan (pola sama seperti OllamaConnector.PreWarmModel di Unity).
+
+    Best-effort, TIDAK melempar exception. Ollama mungkin masih menarik image
+    container atau modelnya belum ditarik manual (langkah sekali jalan, lihat
+    README) -- itu bukan alasan menggagalkan startup service, karena Groq
+    fallback tetap menutupi sampai Qwen siap.
+    """
     try:
-        resp = httpx.post(
-            GROQ_URL,
-            headers={"Authorization": f"Bearer {api_key}"},
+        httpx.post(
+            OLLAMA_URL,
             json={
-                "model": GROQ_MODEL,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.2,
+                "model": OLLAMA_MODEL,
+                "messages": [{"role": "user", "content": "hi"}],
+                "temperature": 0,
             },
-            timeout=GROQ_TIMEOUT_SECONDS,
+            timeout=OLLAMA_TIMEOUT_SECONDS,
         )
-        resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"].strip()
+        print(f"[startup] Ollama ({OLLAMA_MODEL}) siap.")
     except Exception as e:
-        raise RuntimeError(f"Groq gagal: {e}") from e
+        print(f"[startup] Ollama pre-warm gagal ({e}). Groq fallback dipakai sampai Qwen siap.")

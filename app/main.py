@@ -28,7 +28,7 @@ from psycopg_pool import ConnectionPool
 from psycopg.rows import dict_row
 from pydantic import BaseModel
 
-from app.assistant import embedding
+from app.assistant import embedding, generation
 from app.assistant.router import router as assistant_router
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
@@ -74,18 +74,23 @@ async def lifespan(app: FastAPI):
     )
     app.state.pool.open()
 
-    # Gagal berisik di startup, bukan diam-diam jalan lalu error saat request
-    # pertama masuk (spec section 8.3).
+    # Groq sekarang FALLBACK, bukan wajib -- Qwen lokal (Ollama) jadi provider
+    # UTAMA (lihat app/assistant/generation.py). Kosongnya bukan lagi fatal di
+    # startup, cuma peringatan: endpoint asisten tetap bisa berfungsi penuh lewat
+    # Qwen saja, dan baru terasa kalau Qwen JUGA gagal saat itu (503 per-request).
     if not os.environ.get("GROQ_API_KEY", ""):
-        raise RuntimeError(
-            "GROQ_API_KEY kosong. Endpoint /api/assistant/query tidak bisa berfungsi."
-        )
+        print("[startup] PERINGATAN: GROQ_API_KEY kosong -- fallback LLM tidak "
+              "akan berfungsi kalau Ollama gagal.")
 
     # Muat model embedding sekali di startup, bukan per-request. Tanpa ini request
     # pertama akan lambat seperti gejala pre-warm Ollama di repo Unity. Kalau bobot
     # model gagal dimuat, exception di sini menggagalkan startup — itu memang yang
     # diinginkan, daripada service hidup tanpa kemampuan retrieval.
     embedding.load_model()
+
+    # Best-effort, TIDAK menggagalkan startup kalau Ollama belum siap (image masih
+    # ditarik, atau model qwen2.5:7b belum ditarik manual -- lihat README).
+    generation.prewarm_ollama()
 
     try:
         yield
