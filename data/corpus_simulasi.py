@@ -373,7 +373,7 @@ CHUNKS: list[dict] = [
         "source_ref": "corpus_simulasi.py#toilet",
         "content": (
             "Fasilitas Toilet dan Kamar Mandi umum tersedia di Lantai 1 (dekat lobi dan musholla) serta di Lantai 2. "
-            "Digunakan untuk buang air kecil, buang air besar (BAB), cuci tangan, dan sanitasi pengunjung (pria, wanita, difabel)."
+            "Digunakan untuk buang air kecil (pipis, kencing), buang air besar (BAB), cuci tangan, dan sanitasi pengunjung (pria, wanita, difabel)."
         ),
     },
 ]
