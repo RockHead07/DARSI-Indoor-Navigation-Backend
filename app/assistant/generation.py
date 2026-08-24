@@ -52,7 +52,7 @@ _SYSTEM_PROMPT = """Kamu asisten informasi RS Islam A. Yani.
 Aturan:
 - Jawab HANYA berdasarkan informasi di bawah. Jangan mengarang apa pun yang tidak ada di sana.
 - TRIASE GAWAT DARURAT: Jika pengguna menyebutkan kondisi gawat darurat atau kecelakaan (misal tertabrak motor/mobil, tabrakan, pendarahan, patah tulang, luka parah, pingsan, kejang, demam tinggi/step anak, sesak napas akut, nyeri dada), WAJIB langsung mengarahkan pasien untuk segera menuju ke IGD di Lantai 1 tanpa perlu menunggu pendaftaran poli.
-- WAYFINDING & LOKASI: Jika pertanyaan menanyakan tempat atau fasilitas (misal toilet, farmasi, kasir, radiologi, rontgen, musholla, kantin, lift, parkir mobil/motor), sebutkan nama lokasi dan lantainya dengan jelas di awal jawaban.
+- WAYFINDING & LOKASI: Jika pertanyaan menanyakan tempat, fasilitas, ATAU jadwal praktek dokter/poliklinik (misal toilet, farmasi, kasir, radiologi, rontgen, musholla, kantin, lift, parkir mobil/motor, jadwal dokter, poli), sebutkan nama lokasi dan lantainya dengan jelas di awal jawaban -- termasuk lantai poli kalau informasinya tersedia di JADWAL PRAKTEK DOKTER.
 - Jika informasinya tidak cukup, katakan terus terang dan arahkan ke petugas Informasi di Lantai 1.
 - Pertanyaan di luar urusan rumah sakit (resep masakan, cuaca, jadwal kereta, dll): tolak dengan santun dan tegaskan kamu hanya melayani informasi RS Islam A. Yani.
 - Jawab ringkas, jelas, dan santun dalam Bahasa Indonesia, maksimal 3 kalimat.
@@ -82,8 +82,9 @@ def build_prompt(
         bagian.append("")
         bagian.append("JADWAL PRAKTEK DOKTER:")
         for s in schedules:
+            lokasi = f", {s.floor}" if s.floor else ""
             bagian.append(
-                f"- {s.doctor_name} ({s.specialty}), "
+                f"- {s.doctor_name} ({s.specialty}{lokasi}), "
                 f"{_HARI[s.day_of_week]} {s.start_time}-{s.end_time}"
             )
 

@@ -21,5 +21,7 @@
   {"q": "saya bawa kursi roda naik kemana", "expect": "Fasilitas Lift dan Elevator"},
   {"q": "pintu masuk rumah sakit sebelah mana", "expect": "Lobi Utama dan Informasi"},
   {"q": "mau pipis kebelet banget", "expect": "Fasilitas Toilet dan Kamar Mandi"},
-  {"q": "tangan saya melepuh gara gara minyak panas", "expect": "Alur Pasien IGD dan Penanganan Darurat"}
+  {"q": "tangan saya melepuh gara gara minyak panas", "expect": "Alur Pasien IGD dan Penanganan Darurat"},
+  {"q": "mau bikin janji sama dokter spesialis dulu", "expect": "Cara Membuat Janji Temu Dokter"},
+  {"q": "pasang spiral kb dimana ya", "expect": "Poli Kandungan dan Kebidanan"}
 ]

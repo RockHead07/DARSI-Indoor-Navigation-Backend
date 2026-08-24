@@ -223,6 +223,21 @@ def find_schedules(
         )
         rows = cur.fetchall()
 
+        # Lantai poli TIDAK ADA di doctor_schedules (poi_unity_id-nya None untuk
+        # semua baris simulasi) -- diturunkan dari chunk "Poli <spesialisasi>" yang
+        # sudah lebih dulu ada di knowledge_chunks, satu query per specialty unik
+        # yang muncul di hasil, bukan query per baris jadwal.
+        floor_by_specialty: dict[str, str | None] = {}
+        for specialty in {r["specialty"] for r in rows}:
+            cur.execute(
+                """SELECT floor FROM knowledge_chunks
+                   WHERE title ILIKE 'Poli%%' AND title ILIKE %(pat)s
+                   LIMIT 1""",
+                {"pat": f"%{specialty}%"},
+            )
+            match = cur.fetchone()
+            floor_by_specialty[specialty] = match["floor"] if match else None
+
     return [
         ScheduleRow(
             doctor_name=r["doctor_name"],
@@ -232,6 +247,7 @@ def find_schedules(
             end_time=r["end_time"].strftime("%H:%M"),
             poi_unity_id=r["poi_unity_id"],
             is_simulated=r["is_simulated"],
+            floor=floor_by_specialty.get(r["specialty"]),
         )
         for r in rows
     ]

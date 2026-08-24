@@ -11,10 +11,11 @@ def _chunk(title="Layanan Farmasi", content="Farmasi buka 07.00 sampai 21.00."):
     )
 
 
-def _sched():
+def _sched(floor=None):
     return ScheduleRow(
         doctor_name="dr. Fulan Hidayat, Sp.A", specialty="Anak", day_of_week=1,
         start_time="08:00", end_time="14:00", poi_unity_id=None, is_simulated=True,
+        floor=floor,
     )
 
 
@@ -33,6 +34,19 @@ def test_prompt_memuat_jadwal_dalam_bentuk_terbaca():
     assert "dr. Fulan Hidayat, Sp.A" in prompt
     assert "Senin" in prompt
     assert "08:00" in prompt
+
+
+def test_prompt_jadwal_menyertakan_lantai_kalau_ada():
+    """Regresi: jadwal dokter tanpa lantai bikin LLM tidak pernah sebut lokasi
+    poli (bug ditemukan lewat eval_llm_judge -- 4 dari 4 kegagalan Poliklinik
+    di dua run berbeda gara-gara ini)."""
+    prompt = build_prompt("dokter anak kapan", [], [_sched(floor="Lantai 2")])
+    assert "Lantai 2" in prompt
+
+
+def test_prompt_jadwal_tanpa_lantai_tidak_error():
+    prompt = build_prompt("dokter anak kapan", [], [_sched(floor=None)])
+    assert "dr. Fulan Hidayat, Sp.A" in prompt
 
 
 def test_prompt_melarang_mengarang():

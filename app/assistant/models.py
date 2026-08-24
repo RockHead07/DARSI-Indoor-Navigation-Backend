@@ -52,6 +52,11 @@ class ScheduleRow:
     end_time: str             # "14:00"
     poi_unity_id: str | None
     is_simulated: bool
+    # Diturunkan dari knowledge_chunks (chunk "Poli <specialty>"), BUKAN kolom
+    # tersendiri di doctor_schedules -- poi_unity_id di baris jadwal simulasi
+    # semuanya None, jadi lantai tidak bisa didapat dari situ. None kalau tidak
+    # ketemu chunk Poli yang cocok (jangan diasumsikan tidak ada lantainya).
+    floor: str | None = None
 
 
 def derive_poi(chunks: list[RetrievedChunk]) -> tuple[str | None, str | None]:

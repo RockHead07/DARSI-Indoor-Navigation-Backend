@@ -279,7 +279,8 @@ CHUNKS: list[dict] = [
         "content": (
             "Poli Kandungan dan Kebidanan berada di Lantai 2 melayani pemeriksaan kehamilan, kontrol "
             "rutin ibu hamil, USG kandungan, keluhan haid, keputihan, program hamil, "
-            "dan konsultasi keluarga berencana (KB). Ibu yang akan melahirkan ditangani di Ruang Bersalin."
+            "dan konsultasi keluarga berencana (KB, termasuk pasang/lepas spiral atau IUD, suntik KB, pil KB, implan/susuk). "
+            "Ibu yang akan melahirkan ditangani di Ruang Bersalin."
         ),
     },
     {
@@ -374,6 +375,19 @@ CHUNKS: list[dict] = [
         "content": (
             "Fasilitas Toilet dan Kamar Mandi umum tersedia di Lantai 1 (dekat lobi dan musholla) serta di Lantai 2. "
             "Digunakan untuk buang air kecil (pipis, kencing), buang air besar (BAB), cuci tangan, dan sanitasi pengunjung (pria, wanita, difabel)."
+        ),
+    },
+    {
+        "title": "Cara Membuat Janji Temu Dokter",
+        "doc_type": "faq",
+        "floor": "Lantai 1",
+        "building": "RS Islam Ahmad Yani",
+        "poi_unity_id": None,
+        "source_ref": "corpus_simulasi.py#janji_temu",
+        "content": (
+            "Cara membuat janji temu dengan dokter spesialis: datang langsung ke loket Resepsionis / "
+            "Pendaftaran Lantai 1, sebutkan nama dokter atau poli yang dituju, dan petugas akan "
+            "membantu mengatur jadwal kunjungan sesuai jam praktek dokter yang bersangkutan."
         ),
     },
 ]

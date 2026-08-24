@@ -30,5 +30,6 @@
   {"q": "mau foto rontgen dada dimana", "expect": "Ruang X-Ray dan Foto Rontgen"},
   {"q": "ada lift ga buat ke lantai 2", "expect": "Fasilitas Lift dan Elevator"},
   {"q": "mau nanya nanya ke resepsionis dimana", "expect": "Lobi Utama dan Informasi"},
-  {"q": "kalau mau bab toiletnya dimana", "expect": "Fasilitas Toilet dan Kamar Mandi"}
+  {"q": "kalau mau bab toiletnya dimana", "expect": "Fasilitas Toilet dan Kamar Mandi"},
+  {"q": "gimana caranya buat janjian sama dokter", "expect": "Cara Membuat Janji Temu Dokter"}
 ]
