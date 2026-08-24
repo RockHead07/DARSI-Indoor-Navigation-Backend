@@ -36,7 +36,7 @@ CHUNKS: list[dict] = [
             "darurat langsung menuju IGD di Lantai 1 tanpa mendaftar lebih dulu di loket biasa. "
             "IGD menangani korban kecelakaan lalu lintas, tabrakan motor, tabrakan mobil, "
             "jatuh dari ketinggian, luka robek, pendarahan hebat, patah tulang, cedera kepala, "
-            "luka bakar, pingsan, tidak sadarkan diri, kejang-kejang, sesak napas akut, "
+            "luka bakar (tersiram air panas, melepuh, kena minyak panas), pingsan, tidak sadarkan diri, kejang-kejang, sesak napas akut, "
             "nyeri dada mendadak, serangan jantung, stroke, keracunan makanan/zat kimia, "
             "dan demam tinggi mendadak atau step pada anak. Jika kondisi darurat atau "
             "mengancam nyawa, segera masuk IGD. Administrasi diurus keluarga belakangan."
