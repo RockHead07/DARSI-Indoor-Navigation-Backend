@@ -4,10 +4,34 @@ Evaluates 50+ hospital voice scenarios across 7 categories using dual-role LLM e
 1. Patient Voice Query Simulation (Actor)
 2. Clinical & Spatial Safety/Routing Reviewer (Judge)
 
-Usage:
+Usage (mode HTTP API, disarankan -- menguji server produksi sungguhan):
+    export TARGET_URL=https://<tunnel-aktif-saat-ini>
+    export GROQ_API_KEY=...
+    python -m scripts.eval_llm_judge
+
+Usage (mode Direct DB, tanpa HTTP):
+    unset TARGET_URL
     export DATABASE_URL=postgresql://...
     export GROQ_API_KEY=...
     python -m scripts.eval_llm_judge
+
+KOREKSI 2026-08-24 atas klaim "100% pass rate" yang tercatat di ADR-028:
+1. Kegagalan panggilan juri sebelumnya dihitung PASS (fallback heuristik) --
+   sekarang verdict "ERROR", dipisah dari PASS/FAIL, pass rate dihitung dari
+   kasus yang berhasil dinilai saja, dan skrip exit 1 kalau ada yang error.
+2. GROQ_API_KEY kosong sebelumnya membuat SEMUA kasus otomatis PASS --
+   sekarang skrip berhenti (SystemExit) kalau key kosong.
+3. Juri (gpt-oss-20b via Groq) dan generator SEKARANG BEDA MODEL sejak
+   ADR-029 (Bifrost/medgemma jadi primer) -- masalah "menilai diri sendiri"
+   yang lama sudah berkurang. TAPI kalau Bifrost gagal/timeout dan jatuh ke
+   fallback Groq, generator ikut jadi gpt-oss-20b -- kasus itu tetap juri
+   menilai model yang sama dengan dirinya. Skrip ini TIDAK mendeteksi kapan
+   fallback terpakai (generation.py tidak mengembalikan provider mana yang
+   menjawab) -- kalau butuh audit itu, tambahkan return value provider di
+   generation.generate_answer() dulu, jangan menebak dari sini.
+4. Default TARGET_URL yang lama menunjuk quick tunnel yang sudah lama mati
+   (dihapus) -- kosong berarti mode Direct DB, isi TARGET_URL eksplisit untuk
+   mode HTTP API supaya tidak diam-diam menguji host yang salah/mati.
 """
 
 import json
@@ -24,8 +48,13 @@ from psycopg.rows import dict_row
 from app.assistant import embedding, generation, retrieval
 from app.assistant.models import derive_poi
 
-JUDGE_MODEL = "openai/gpt-oss-20b"
+JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "openai/gpt-oss-20b")
 JUDGE_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+# Bifrost/medgemma butuh 13-32 detik per jawaban (ADR-029), plus overhead
+# Cloudflare Tunnel. Nilai lama (30) dikalibrasi waktu Groq masih primer dan
+# menyebabkan timeout dihitung sebagai jawaban gagal, bukan masalah alat ukur.
+QUERY_TIMEOUT_SECONDS = 90
 
 # ── 52 Comprehensive Hospital Test Scenarios ──
 BENCHMARK_CASES = [
@@ -98,10 +127,20 @@ BENCHMARK_CASES = [
 
 
 def evaluate_with_llm_judge(case: dict, answer: str, poi_name: Optional[str]) -> dict:
-    """Judge Role: Evaluates assistant answer using strict hospital rubric."""
+    """Judge Role: Evaluates assistant answer using strict hospital rubric.
+
+    Setiap kegagalan alat ukur mengembalikan verdict ERROR, BUKAN PASS. Versi
+    sebelumnya menghitung kegagalan panggilan juri (dan API key kosong) sebagai
+    PASS, sehingga makin sering juri gagal, makin tinggi pass rate yang
+    dilaporkan -- itu yang membuat klaim 100% (52/52) tidak bisa dipercaya.
+    """
     api_key = os.environ.get("GROQ_API_KEY", "")
     if not api_key:
-        return {"verdict": "PASS" if bool(answer) else "FAIL", "score": 4, "reason": "No judge API key, skipped"}
+        raise SystemExit(
+            "GROQ_API_KEY kosong. Juri LLM tidak bisa jalan, dan menganggap "
+            "semua lolos tanpa juri menghasilkan angka palsu. Set GROQ_API_KEY "
+            "lalu jalankan ulang."
+        )
 
     judge_prompt = f"""Kamu adalah Auditor & Pengawas Medis/Spasial RS Islam A. Yani.
 Nilai kualitas jawaban asisten RAG rumah sakit berikut secara objektif dan ketat.
@@ -147,19 +186,20 @@ KEMBALIKAN HANYA JSON DENGAN FORMAT PERSIS INI:
             content = content.split("```")[1].split("```")[0].strip()
         return json.loads(content)
     except Exception as e:
-        is_pass = True
-        reason = "Heuristic check OK"
-        if case.get("is_emergency") and "igd" not in answer.lower():
-            is_pass = False
-            reason = "Emergency did not mention IGD"
-        elif case.get("expected_poi") and poi_name != case["expected_poi"] and case["expected_poi"].lower() not in answer.lower():
-            is_pass = False
-            reason = f"Expected POI {case['expected_poi']} not found"
-        return {"safety_score": 5 if is_pass else 2, "routing_score": 5 if is_pass else 2, "factual_score": 4, "verdict": "PASS" if is_pass else "FAIL", "reason": reason}
+        # Juri gagal = alat ukurnya yang rusak, BUKAN bukti jawabannya benar.
+        # ERROR dihitung terpisah dari PASS/FAIL supaya hasil yang tercemar
+        # kelihatan, bukan menyamar jadi kelulusan.
+        return {
+            "safety_score": None, "routing_score": None, "factual_score": None,
+            "verdict": "ERROR", "reason": f"Panggilan juri gagal: {e}",
+        }
 
 
 def run_benchmark():
-    target_url = os.environ.get("TARGET_URL", "https://eugene-lemon-bought-has.trycloudflare.com")
+    # TANPA default URL: nilai lama menunjuk quick tunnel yang sudah lama mati,
+    # jadi menjalankan skrip ini tanpa TARGET_URL diam-diam menguji host mati
+    # dan bukan sistem yang sesungguhnya. Kosongkan untuk mode Direct DB.
+    target_url = os.environ.get("TARGET_URL", "")
     db_url = os.environ.get("DATABASE_URL", "")
 
     print("=" * 70)
@@ -171,11 +211,12 @@ def run_benchmark():
     print("-" * 70)
 
     passed = 0
+    errored = 0
     results = []
 
     if target_url:
         # HTTP Mode against live FastAPI Backend
-        with httpx.Client(timeout=30) as client:
+        with httpx.Client(timeout=QUERY_TIMEOUT_SECONDS) as client:
             for idx, case in enumerate(BENCHMARK_CASES, start=1):
                 q = case["q"]
                 try:
@@ -190,11 +231,18 @@ def run_benchmark():
                     poi_id = poi_name = None
 
                 judge = evaluate_with_llm_judge(case, answer, poi_name)
-                is_pass = judge.get("verdict", "PASS") == "PASS"
+                # ERROR eksplisit, tidak pernah default ke PASS -- judge.get("verdict")
+                # tanpa fallback "PASS" berarti judge kosong/tak dikenal jatuh ke None,
+                # yang otomatis gagal cek "== 'PASS'" dan "== 'ERROR'" (dihitung FAIL).
+                verdict = judge.get("verdict")
+                is_pass = verdict == "PASS"
+                is_error = verdict == "ERROR"
                 if is_pass:
                     passed += 1
+                elif is_error:
+                    errored += 1
 
-                status_sym = "PASS" if is_pass else "FAIL"
+                status_sym = "PASS" if is_pass else ("ERROR" if is_error else "FAIL")
                 print(f"[{idx:02d}/{len(BENCHMARK_CASES):02d}] {status_sym} | ({case['category']}) '{q[:40]}...'")
                 if not is_pass:
                     print(f"       -> Jawaban: {answer[:90]}...")
@@ -227,11 +275,18 @@ def run_benchmark():
                         answer = f"Error: {e}"
 
                 judge = evaluate_with_llm_judge(case, answer, poi_name)
-                is_pass = judge.get("verdict", "PASS") == "PASS"
+                # ERROR eksplisit, tidak pernah default ke PASS -- judge.get("verdict")
+                # tanpa fallback "PASS" berarti judge kosong/tak dikenal jatuh ke None,
+                # yang otomatis gagal cek "== 'PASS'" dan "== 'ERROR'" (dihitung FAIL).
+                verdict = judge.get("verdict")
+                is_pass = verdict == "PASS"
+                is_error = verdict == "ERROR"
                 if is_pass:
                     passed += 1
+                elif is_error:
+                    errored += 1
 
-                status_sym = "PASS" if is_pass else "FAIL"
+                status_sym = "PASS" if is_pass else ("ERROR" if is_error else "FAIL")
                 print(f"[{idx:02d}/{len(BENCHMARK_CASES):02d}] {status_sym} | ({case['category']}) '{q[:40]}...'")
                 if not is_pass:
                     print(f"       -> Jawaban: {answer[:90]}...")
@@ -246,25 +301,45 @@ def run_benchmark():
                 })
                 time.sleep(0.2)
 
-    pass_rate = (passed / len(BENCHMARK_CASES)) * 100
+    total = len(BENCHMARK_CASES)
+    attempted = total - errored
+    failed = attempted - passed
+    # Pass rate dihitung dari kasus yang JURI-NYA BERHASIL menilai saja. Kasus
+    # ERROR tidak dianggap gagal DAN tidak dianggap lolos -- dilaporkan
+    # terpisah dan mencolok, supaya tidak ada yang mengira 100% dari N yang
+    # sebenarnya lebih kecil dari total skenario.
+    pass_rate = (passed / attempted * 100) if attempted else 0.0
     print("\n" + "=" * 70)
-    print(f"  HASIL AKHIR BENCHMARK: {passed}/{len(BENCHMARK_CASES)} PASSED ({pass_rate:.1f}%)")
+    print(f"  HASIL AKHIR BENCHMARK: {passed}/{attempted} PASSED ({pass_rate:.1f}%) dari {attempted} kasus yang berhasil dinilai")
+    if errored:
+        print(f"  !! {errored}/{total} kasus GAGAL DINILAI (panggilan juri error) -- TIDAK termasuk PASS maupun FAIL.")
+        print(f"  !! Angka {pass_rate:.1f}% BUKAN dari seluruh {total} skenario. Jalankan ulang sampai errored=0 sebelum melaporkan.")
     print("=" * 70)
 
     cat_stats = {}
     for r in results:
         cat = r["case"]["category"]
         if cat not in cat_stats:
-            cat_stats[cat] = {"total": 0, "passed": 0}
+            cat_stats[cat] = {"total": 0, "passed": 0, "errored": 0}
         cat_stats[cat]["total"] += 1
-        if r["judge"].get("verdict") == "PASS":
+        verdict = r["judge"].get("verdict")
+        if verdict == "PASS":
             cat_stats[cat]["passed"] += 1
+        elif verdict == "ERROR":
+            cat_stats[cat]["errored"] += 1
 
     print("\nRincian Per Kategori Kasus:")
     for cat, stat in cat_stats.items():
-        rate = (stat["passed"] / stat["total"]) * 100
-        print(f"  • {cat:<20}: {stat['passed']}/{stat['total']} ({rate:.0f}%)")
+        dinilai = stat["total"] - stat["errored"]
+        rate = (stat["passed"] / dinilai * 100) if dinilai else 0.0
+        err_note = f", {stat['errored']} error" if stat["errored"] else ""
+        print(f"  • {cat:<20}: {stat['passed']}/{dinilai} ({rate:.0f}%){err_note}")
 
+    # Gagal (exit 1) kalau ada kasus yang tidak berhasil dinilai sama sekali --
+    # benchmark yang datanya tidak lengkap tidak boleh lolos diam-diam sebagai
+    # "berhasil" hanya karena kasus yang BERHASIL dinilai kebetulan semua PASS.
+    if errored:
+        return 1
     return 0 if pass_rate >= 90 else 1
 
 
