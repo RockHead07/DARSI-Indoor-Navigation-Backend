@@ -52,10 +52,61 @@ berdasarkan itu, set tersebut pensiun sebagai alat ukur.** Tulis set baru.
 | Hybrid RRF + stopword + celah "sholat" | 100% | 72,2% | — | — |
 | Perluas corpus 13 → 25 dokumen | 94,4% | 88,9% | **85,7%** | — |
 | Tambal 4 celah kosakata | 88,9% | 88,9% | **100%** | **71,9%** |
+| Corpus ditulis ulang jadi 27 dokumen (`610f25e`, terikat POI GUID), produksi drift dari file sumber, lalu disinkronkan + set uji diperbaiki + 2 celah kosakata baru ditambal (2026-08-24) | 95,7% | 83,3% | 91,3% | **71,9%** |
 
-Perhatikan baris terakhir. Itu inti seluruh laporan ini.
+Perhatikan baris terakhir kolom test-2. Angkanya kebetulan identik dengan
+pengukuran sebelumnya, tapi ini SUNGGUHAN diukur ulang terhadap corpus 27
+dokumen yang sekarang jalan di produksi (bukan dipakai ulang dari pengukuran
+lama) — lihat §3.1 untuk detail insidennya.
 
 ---
+
+### 3.1. Insiden Corpus Drift (2026-08-24)
+
+Commit `610f25e` (2026-08-22, dikerjakan otomatis) menulis ulang seluruh
+`corpus_simulasi.py` supaya tiap chunk terikat GUID POI asli (ADR-028) —
+25 dokumen lama berubah jadi 27 (judul berubah untuk beberapa, Fisioterapi/
+MCU/Informasi-Janji-Temu dibuang karena tidak match POI manapun, Toilet/
+Lift/Ruang-X-Ray-terpisah/Parkir-terpisah/Lobi-Utama ditambah). Database
+produksi tidak pernah di-ingest ulang sejak commit itu — ditemukan 2026-08-24
+saat menguji query "toilet ada dimana" dari Unity dan hasilnya kosong padahal
+chunk-nya ada di file sumber.
+
+Root cause kedua: `scripts/ingest_corpus.py` upsert berdasarkan `(title,
+source_ref)`, TIDAK PERNAH menghapus baris lama. Kalau judul berubah, baris
+lama nyangkut jadi duplikat basi selamanya kalau langsung di-`ingest` ulang
+tanpa dibersihkan dulu. Prosedur sinkron yang benar: `DELETE FROM
+knowledge_chunks WHERE is_simulated = true;` dulu, baru
+`python -m scripts.ingest_corpus`.
+
+Setelah database disinkronkan, 4 set uji diaudit terhadap corpus baru:
+- 6 judul di-*rename* mengikuti perubahan corpus (mis. "Alur Pasien IGD" →
+  "Alur Pasien IGD dan Penanganan Darurat") — bukan soal baru, cuma
+  penyesuaian nama target yang sudah benar secara konten.
+- 9 soal (lintas 4 set) dihapus karena target chunk-nya memang sudah tidak
+  ada di corpus (Fisioterapi, MCU, Informasi-dan-Cara-Membuat-Janji-Temu) —
+  BUKAN ditambal, dihapus, karena jawabannya sungguhan sudah tidak tersedia.
+- 4 chunk baru (Toilet, Lift, Ruang X-Ray, Lobi Utama) sebelumnya nol
+  cakupan uji — ditambah 1 soal per chunk di tuning dan 1 soal per chunk
+  (kata-kata beda) di test-2.
+- 2 celah kosakata kolokial baru ketemu dan ditambal lewat set **tuning**
+  (bukan langsung dari kegagalan test-2): "pipis" (toilet) dan sinonim luka
+  bakar sehari-hari — "tersiram air panas", "melepuh", "kena minyak panas"
+  (IGD). Masing-masing diverifikasi lewat soal tuning yang kata-katanya
+  BEDA dari soal test-2 manapun, supaya test-2 tetap tidak tersentuh.
+
+**Yang sengaja TIDAK ditambal malam ini** (dicatat sebagai utang, bukan
+diabaikan):
+- "saya pasien umum cara daftarnya gimana" (tuning) — konten relevan sudah
+  ada, tapi kalah skor lawan chunk lain. Butuh investigasi ranking, bukan
+  tambal kosakata sederhana.
+- "kena air panas melepuh" (test-2) — MASIH kosong walau kontennya sudah
+  diperbaiki (dibuktikan lewat soal tuning berbeda kata-kata yang lolos).
+  Kemungkinan besar gejala §6 (gerbang skor `MIN_TOP_SCORE=0.22`) yang
+  memang sudah lama tercatat sebagai masalah, bukan gagalnya perbaikan
+  kosakata. Test-2 sengaja dibiarkan gagal di sini — menambalnya sekarang
+  berarti menambal berdasarkan kegagalan test-2 itu sendiri, yang membakar
+  keabsahan set ini.
 
 ## 4. Temuan Utama: Set Uji yang Terbakar Memberi Angka Palsu
 

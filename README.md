@@ -76,7 +76,12 @@ APK; boleh kosong tapi endpoint jadi rentan kalau Bifrost juga gagal),
 python -m scripts.eval_retrieval
 ```
 **Angka yang layak dilaporkan: recall@3 = 71,9%** pada set uji bersih 32 pertanyaan
-(78,6% untuk 28 pertanyaan dalam cakupan), di atas corpus simulasi 25 dokumen.
+(78,6% untuk 28 pertanyaan dalam cakupan), di atas corpus simulasi 27 dokumen.
+Diukur ulang 2026-08-24 setelah corpus sempat berubah bentuk (commit `610f25e`,
+25→27 chunk) dan produksi sempat drift dari file sumber — lihat catatan lengkap
+di `docs/RETRIEVAL-EVALUATION.md`. Angkanya kebetulan sama persis dengan
+pengukuran sebelumnya, tapi ini pengukuran BARU terhadap corpus yang sekarang
+sungguhan jalan di produksi, bukan angka lama yang dipakai ulang.
 
 Script mencetak **empat** set sekaligus, dan bedanya penting. Tiga set pertama
 sudah "terbakar": kegagalannya pernah dipakai memperbaiki sistem, jadi angkanya
