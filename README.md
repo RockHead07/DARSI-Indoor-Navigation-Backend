@@ -76,13 +76,20 @@ APK; boleh kosong tapi endpoint jadi rentan kalau Bifrost juga gagal),
 python -m scripts.eval_retrieval
 ```
 **Angka yang layak dilaporkan: recall@3 = 71,9%** pada set uji bersih 32 pertanyaan
-(78,6% untuk 28 pertanyaan dalam cakupan), di atas corpus simulasi 28 dokumen.
-Diukur ulang 2026-08-24 setelah corpus sempat berubah bentuk (commit `610f25e`,
-25→27 chunk, lalu 27→28 saat chunk "Cara Membuat Janji Temu Dokter" ditulis
-ulang) dan produksi sempat drift dari file sumber — lihat catatan lengkap
-di `docs/RETRIEVAL-EVALUATION.md`. Angkanya kebetulan sama persis dengan
-pengukuran sebelumnya, tapi ini pengukuran BARU terhadap corpus yang sekarang
-sungguhan jalan di produksi, bukan angka lama yang dipakai ulang.
+(78,6% untuk 28 pertanyaan dalam cakupan). Diukur 2026-08-24 setelah corpus sempat
+berubah bentuk (commit `610f25e`, 25→27 chunk).
+
+⚠️ **Koreksi 2026-08-25:** angka di atas SEBENARNYA diukur terhadap corpus
+**27 chunk**, bukan 28 seperti sempat tertulis di sini. Chunk ke-28 ("Cara
+Membuat Janji Temu Dokter", ditulis di commit `803f2fa`) ternyata **tidak
+pernah ter-ingest ke produksi** — kemungkinan diedit setelah `ingest_corpus.py`
+terakhir dijalankan, dan tidak pernah di-ingest ulang. Baru terdeteksi &
+diperbaiki 2026-08-25 lewat `docker compose exec api python -m
+scripts.ingest_corpus`, dikonfirmasi via query DB langsung (`SELECT count(*)
+FROM knowledge_chunks` = 27 sebelum, 28 sesudah). recall@3 71,9% BELUM diukur
+ulang terhadap corpus 28-chunk yang genuinely jalan sekarang — pelajaran yang
+sama berulang: klaim "sudah di-deploy" butuh bukti eksekusi (query DB),
+bukan cuma "skrip jalan tanpa error".
 
 Script mencetak **empat** set sekaligus, dan bedanya penting. Tiga set pertama
 sudah "terbakar": kegagalannya pernah dipakai memperbaiki sistem, jadi angkanya
@@ -111,11 +118,13 @@ seperti retrieval — skenarionya tetap (fixed list di skrip), jadi boleh
 dijalankan ulang sebagai regression test tiap ada perbaikan, tidak "terbakar"
 seperti `test-2`.
 
-**Terakhir diukur bersih (52/52 dinilai, tanpa error) 2026-08-24: 45/52
-(86,5%).** Angka ini **lower-bound**, bukan final — 2 perbaikan (kosakata
-"spiral KB", rubrik penolakan out-of-scope) di-deploy SETELAH run ini,
-diverifikasi manual lewat curl tapi belum diukur ulang lewat 52 skenario
-penuh. Rincian per kategori ada di tabel parameter di bawah.
+**Terakhir diukur bersih (52/52 dinilai, tanpa error) 2026-08-25: 46/52
+(88,5%).** Ini run kedua, menggabungkan 2 perbaikan (kosakata "spiral KB",
+rubrik penolakan out-of-scope) yang sebelumnya cuma diverifikasi individual.
+Angka ini SENDIRI juga **lower-bound**: 1 perbaikan lagi (chunk "Cara Janji
+Temu Dokter" yang ternyata belum ter-ingest ke produksi, lihat §recall@3 di
+atas) di-deploy SETELAH run ini, cuma diverifikasi manual lewat curl. Rincian
+per kategori dan daftar 6 kegagalan ada di tabel parameter di bawah.
 
 ### Ringkasan parameter & angka terukur
 
@@ -125,21 +134,21 @@ di kertas) — lihat `docs/RETRIEVAL-EVALUATION.md` untuk metodologi lengkap.
 | Parameter | Nilai | Catatan |
 |---|---|---|
 | Model embedding | `paraphrase-multilingual-MiniLM-L12-v2` (384 dim) | mpnet-base (768 dim) diuji, dibatalkan — nol perbaikan terukur, +0,8GB memori |
-| Ukuran corpus | 28 chunk (simulasi) | naik dari 27 (2026-08-24), chunk "Cara Membuat Janji Temu Dokter" ditulis ulang |
+| Ukuran corpus | 28 chunk (simulasi) | genuinely 28 sejak 2026-08-25 (lihat koreksi §recall@3 — sempat cuma 27 di produksi tanpa disadari) |
 | Retrieval | Hybrid: pgvector (cosine) + full-text `indonesian` via RRF (k=60) | ambang absolut terbukti tidak layak (cosine tidak terkalibrasi), lihat §evaluasi |
-| Ambang skor (`MIN_TOP_SCORE`) | 0,22 | dikenal menolak sebagian query valid; 0,15 terukur lebih baik (81,2%) tapi BELUM diterapkan — butuh set uji baru dulu, lihat `RETRIEVAL-EVALUATION.md` §6 |
-| **recall@3 (retrieval murni)** | **71,9%** (32 soal bersih, `test-2`) | SAH dilaporkan; diukur ulang 2026-08-24 terhadap corpus produksi sungguhan |
+| Ambang skor (`MIN_TOP_SCORE`) | 0,22 | gerbang HANYA baca skor vector, full-text tidak ikut menentukan lolos/tidak — terbukti 2026-08-25: query dengan kata kunci PERSIS ("robek") tetap tertolak kalau parafrase-nya membuat skor vector di bawah 0,22. 0,15 terukur lebih baik (81,2%) tapi BELUM diterapkan — butuh set uji baru dulu, lihat `RETRIEVAL-EVALUATION.md` §6 |
+| **recall@3 (retrieval murni)** | **71,9%** (32 soal bersih, `test-2`) | diukur 2026-08-24 terhadap corpus yang TERNYATA 27 chunk (lihat koreksi di atas), belum diukur ulang terhadap 28 chunk genuine |
 | LLM primer | Bifrost / `medgemma-1.5-4b-it-q4` | gateway eksternal `hcm-lab.id`, tuning domain medis (ADR-029) |
 | LLM fallback | Groq / `openai/gpt-oss-20b` | dipanggil server-side, tidak pernah dari client |
 | Latensi jawaban (Bifrost) | 12-32 detik | reasoning trace medgemma + overhead Cloudflare Tunnel |
-| **eval_llm_judge (end-to-end, 52 skenario)** | **45/52 (86,5%)** | lower-bound, mendahului 2 perbaikan terbaru (lihat rincian kategori di bawah) |
-| ↳ Gawat Darurat | 9/10 (90%) | 1 kegagalan = korban ambang skor 0,22 (belum ditambal, sengaja) |
-| ↳ Poliklinik | 7/10 (70%) | jadwal dokter kadang tidak sebut lokasi — perbaikan sudah jalan sebagian, sisanya diduga variasi sampling LLM |
+| **eval_llm_judge (end-to-end, 52 skenario)** | **46/52 (88,5%)** | diukur 2026-08-25; lower-bound, mendahului 1 perbaikan terbaru (chunk janji-temu, lihat rincian kategori) |
+| ↳ Gawat Darurat | 9/10 (90%) | 1 kegagalan = korban gerbang `MIN_TOP_SCORE` (akar terkonfirmasi 2026-08-25, sengaja belum ditambal) |
+| ↳ Poliklinik | 8/10 (80%) | 2 gagal: jadwal dokter anak tidak sebut nama poli — diduga variasi sampling LLM, bukan bug kode |
 | ↳ Farmasi | 6/6 (100%) | |
 | ↳ Diagnostik | 6/6 (100%) | |
-| ↳ Administrasi | 4/6 (67%) | 1 gagal = error jaringan lokal sesaat (bukan bug sistem) |
+| ↳ Administrasi | 4/6 (67%) | 2 gagal: rujukan BPJS tidak sebut Resepsionis (belum diselidiki); chunk janji-temu-dokter tidak ter-ingest ke produksi — **diperbaiki & diverifikasi 2026-08-25**, belum ikut angka agregat ini |
 | ↳ Fasilitas Umum | 10/10 (100%) | |
-| ↳ Di Luar Cakupan | 3/4 (75%) | perbaikan rubrik prompt sudah di-deploy, belum diukur ulang |
+| ↳ Di Luar Cakupan | 3/4 (75%) | 1 gagal = `poi_id` tetap ke-isi walau jawaban teks benar menolak (gejala `MIN_TOP_SCORE` yang sama) |
 | Ingress | Cloudflare Named Tunnel permanen | `https://api-darsi.rockhead07.tech`, systemd service, survive restart |
 | Keamanan admin | `POI_SYNC_TOKEN` dirotasi | token acak 48-hex, default lama sudah ditolak (401) |
 
