@@ -229,7 +229,7 @@ CHUNKS: list[dict] = [
         "content": (
             "Loket Kasir melayani pembayaran biaya pemeriksaan dokter, obat farmasi, dan tindakan medis. "
             "Pembayaran bisa dilakukan secara tunai, kartu debit, kartu kredit, dan QRIS. Pasien umum "
-            "membayar setelah pemeriksaan selesai. Loket Kasir berada di Lantai 1 dekat loket Pendaftaran."
+            "membayar setelah pemeriksaan selesai. Loket Kasir berada di Lantai 1 dekat loket Resepsionis/Pendaftaran."
         ),
     },
     {

@@ -29,6 +29,11 @@ class AssistantQueryResponse(BaseModel):
     poi_id: str | None
     poi_name: str | None
     contains_simulated_data: bool
+    # "bifrost"/"groq" yang benar-benar menjawab; None kalau tanpa konteks (LLM
+    # tidak dipanggil sama sekali). Sebelumnya tidak dilaporkan sama sekali --
+    # kegagalan yang cuma muncul saat fallback ke Groq tidak bisa diaudit dari
+    # luar, cuma bisa diduga (lihat eval_llm_judge.py KOREKSI poin 3).
+    provider: str | None = None
 
 
 @dataclass

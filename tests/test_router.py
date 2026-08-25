@@ -30,7 +30,7 @@ def client(monkeypatch):
     from app import main
 
     main.app.state.pool = _FakePool()
-    monkeypatch.setattr(router_mod, "generate_answer", lambda prompt: "Jawaban uji.")
+    monkeypatch.setattr(router_mod, "generate_answer", lambda prompt: ("Jawaban uji.", "bifrost"))
     return TestClient(main.app)
 
 
@@ -49,7 +49,7 @@ def test_response_memuat_semua_field_kontrak(client, monkeypatch):
     assert r.status_code == 200
     body = r.json()
     assert set(body) == {"answer", "sources", "poi_id", "poi_name",
-                         "contains_simulated_data"}
+                         "contains_simulated_data", "provider"}
 
 
 def test_poi_id_diambil_dari_metadata_chunk(client, monkeypatch):
@@ -61,6 +61,14 @@ def test_poi_id_diambil_dari_metadata_chunk(client, monkeypatch):
     body = client.post("/api/assistant/query", json={"user_text": "farmasi"}).json()
     assert body["poi_id"] == "guid-farmasi"
     assert body["poi_name"] == "Farmasi"
+
+
+def test_provider_diteruskan_ke_response(client, monkeypatch):
+    monkeypatch.setattr(router_mod, "search_chunks", lambda *a, **k: [_chunk()])
+    monkeypatch.setattr(router_mod, "find_schedules", lambda *a, **k: [])
+    monkeypatch.setattr(router_mod, "generate_answer", lambda prompt: ("Jawaban Groq.", "groq"))
+    body = client.post("/api/assistant/query", json={"user_text": "farmasi"}).json()
+    assert body["provider"] == "groq"
 
 
 def test_flag_simulasi_menyala_kalau_ada_sumber_simulasi(client, monkeypatch):
@@ -90,6 +98,7 @@ def test_tanpa_hasil_retrieval_menjawab_jujur_tanpa_memanggil_llm(client, monkey
     body = client.post("/api/assistant/query", json={"user_text": "tiket pesawat"}).json()
     assert body["sources"] == []
     assert body["poi_id"] is None
+    assert body["provider"] is None
     assert "tidak" in body["answer"].lower()
 
 

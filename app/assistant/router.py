@@ -37,7 +37,7 @@ def query(payload: AssistantQueryRequest, request: Request) -> AssistantQueryRes
         )
 
     try:
-        answer = generate_answer(build_prompt(payload.user_text, chunks, schedules))
+        answer, provider = generate_answer(build_prompt(payload.user_text, chunks, schedules))
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
 
@@ -60,4 +60,5 @@ def query(payload: AssistantQueryRequest, request: Request) -> AssistantQueryRes
         poi_id=poi_id,
         poi_name=poi_name,
         contains_simulated_data=any(s.is_simulated for s in sources),
+        provider=provider,
     )

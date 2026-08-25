@@ -32,6 +32,13 @@ KOREKSI 2026-08-24 atas klaim "100% pass rate" yang tercatat di ADR-028:
 4. Default TARGET_URL yang lama menunjuk quick tunnel yang sudah lama mati
    (dihapus) -- kosong berarti mode Direct DB, isi TARGET_URL eksplisit untuk
    mode HTTP API supaya tidak diam-diam menguji host yang salah/mati.
+
+KOREKSI 2026-08-25: poin 3 di atas sekarang bisa diaudit, bukan diduga.
+`generate_answer()` mengembalikan (jawaban, provider), diteruskan API lewat
+field response `provider`. Skrip ini mencetak provider di SETIAP baris hasil
+(bukan cuma yang gagal) -- kegagalan intermiten (mis. jadwal dokter kadang
+tidak sebut lokasi) sekarang bisa dikorelasikan dengan fallback Bifrost->Groq
+yang diam-diam terjadi, bukan tebakan lagi.
 """
 
 import json
@@ -250,9 +257,10 @@ def run_benchmark():
                     answer = data.get("answer", "")
                     poi_id = data.get("poi_id")
                     poi_name = data.get("poi_name")
+                    provider = data.get("provider")
                 except Exception as e:
                     answer = f"Error: {e}"
-                    poi_id = poi_name = None
+                    poi_id = poi_name = provider = None
 
                 judge = evaluate_with_llm_judge(case, answer, poi_name)
                 # ERROR eksplisit, tidak pernah default ke PASS -- judge.get("verdict")
@@ -267,7 +275,11 @@ def run_benchmark():
                     errored += 1
 
                 status_sym = "PASS" if is_pass else ("ERROR" if is_error else "FAIL")
-                print(f"[{idx:02d}/{len(BENCHMARK_CASES):02d}] {status_sym} | ({case['category']}) '{q[:40]}...'")
+                # provider ditampilkan di SETIAP baris (bukan cuma yang gagal) --
+                # supaya kegagalan intermiten (mis. jadwal dokter kadang tidak sebut
+                # lokasi) bisa dikorelasikan dengan fallback Bifrost->Groq yang diam-diam
+                # terjadi, bukan diduga-duga lagi (lihat KOREKSI 2026-08-25 di docstring).
+                print(f"[{idx:02d}/{len(BENCHMARK_CASES):02d}] {status_sym} | ({case['category']}) [{provider or '-'}] '{q[:40]}...'")
                 if not is_pass:
                     print(f"       -> Jawaban: {answer[:90]}...")
                     print(f"       -> Evaluasi: {judge.get('reason', '')}")
@@ -277,6 +289,7 @@ def run_benchmark():
                     "answer": answer,
                     "poi_id": poi_id,
                     "poi_name": poi_name,
+                    "provider": provider,
                     "judge": judge,
                 })
                 time.sleep(0.3)
@@ -289,12 +302,13 @@ def run_benchmark():
                 poi_id, poi_name = derive_poi(chunks)
                 schedules = retrieval.find_schedules(conn, q, poi_id)
 
+                provider = None
                 if not chunks and not schedules:
                     answer = generation.NO_CONTEXT_ANSWER
                 else:
                     try:
                         prompt = generation.build_prompt(q, chunks, schedules)
-                        answer = generation.generate_answer(prompt)
+                        answer, provider = generation.generate_answer(prompt)
                     except Exception as e:
                         answer = f"Error: {e}"
 
@@ -311,7 +325,7 @@ def run_benchmark():
                     errored += 1
 
                 status_sym = "PASS" if is_pass else ("ERROR" if is_error else "FAIL")
-                print(f"[{idx:02d}/{len(BENCHMARK_CASES):02d}] {status_sym} | ({case['category']}) '{q[:40]}...'")
+                print(f"[{idx:02d}/{len(BENCHMARK_CASES):02d}] {status_sym} | ({case['category']}) [{provider or '-'}] '{q[:40]}...'")
                 if not is_pass:
                     print(f"       -> Jawaban: {answer[:90]}...")
                     print(f"       -> Evaluasi: {judge.get('reason', '')}")
@@ -321,6 +335,7 @@ def run_benchmark():
                     "answer": answer,
                     "poi_id": poi_id,
                     "poi_name": poi_name,
+                    "provider": provider,
                     "judge": judge,
                 })
                 time.sleep(0.2)

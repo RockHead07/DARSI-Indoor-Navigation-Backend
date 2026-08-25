@@ -94,15 +94,19 @@ def build_prompt(
     return "\n".join(bagian)
 
 
-def generate_answer(prompt: str) -> str:
+def generate_answer(prompt: str) -> tuple[str, str]:
     """Coba Bifrost (medgemma) dulu, Groq kalau gagal. Melempar RuntimeError hanya
     kalau DUA-DUANYA gagal, biar penanganannya (503) tetap di router seperti sebelumnya.
+
+    Return (jawaban, provider) -- provider dilaporkan balik ke response API supaya
+    kegagalan yang cuma muncul saat fallback ke Groq (mis. jawaban kurang lengkap
+    dibanding Bifrost) bisa diaudit, bukan ditebak dari luar (lihat eval_llm_judge.py).
     """
     try:
-        return _try_bifrost(prompt)
+        return _try_bifrost(prompt), "bifrost"
     except Exception as e_bifrost:
         try:
-            return _try_groq(prompt)
+            return _try_groq(prompt), "groq"
         except Exception as e_groq:
             raise RuntimeError(
                 f"Bifrost gagal ({e_bifrost}) dan Groq fallback juga gagal ({e_groq})"
