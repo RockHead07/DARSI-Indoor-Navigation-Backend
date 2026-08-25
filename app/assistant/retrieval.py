@@ -58,6 +58,12 @@ _STOPWORDS = frozenset({
     "mau", "mana", "gimana", "bagaimana", "apa", "apakah", "bisa", "boleh",
     "harus", "kalau", "jika", "saya", "aku", "kita", "itu", "ini", "tidak",
     "ada", "juga", "sih", "dong", "nya", "punya", "dapat", "akan",
+    # "pasang" terlalu generik (berlaku untuk "pasang spiral KB" ATAUPUN "pasang
+    # gigi palsu"/"pemasangan" apa pun) -- stemmer Indonesian menyamakan dengan
+    # "pemasangan", jadi query soal KB ikut menarik chunk Poli Gigi yang tidak
+    # relevan. "spiral"/"implan"/"susuk" di chunk-nya sendiri cukup distingtif
+    # tanpa "pasang" ikut jadi sinyal full-text.
+    "pasang",
 })
 
 
