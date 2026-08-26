@@ -45,20 +45,38 @@ SET_UJI = [
 ]
 
 
-def _jalankan(conn, cases) -> tuple[int, int, list]:
-    lolos, gagal = 0, []
+def _jalankan(conn, cases) -> tuple[dict, list]:
+    """Pisah recall soal SAH dari penolakan soal SAMPAH -- SATU angka gabungan
+    dari keduanya sudah terbukti menyesatkan (2026-08-26): test-4 sempat
+    terbaca 75,0% padahal recall soal sah sebenarnya 95,8%, cuma tertutup 7
+    soal sampah yang "gagal" (tidak kosong).
+
+    Sejak ADR-036 gerbang SENGAJA dilonggarkan (MIN_TOP_SCORE 0,15) dan
+    penyaringan sampah diserahkan ke LLM (build_prompt/generation.py), bukan
+    lagi ke retrieval. Jadi sampah yang lolos gerbang di sini BUKAN kegagalan
+    -- itu memang perilaku yang diharapkan sekarang, sepanjang jawaban LLM-nya
+    tetap benar menolak (diverifikasi terpisah lewat eval_llm_judge.py).
+    """
+    sah_lolos = sah_total = sampah_lolos_gerbang = sampah_total = 0
+    gagal_sah = []
     for case in cases:
         hasil = retrieval.search_chunks(conn, case["q"], None, None, limit=TOP_K)
         judul = [c.title for c in hasil]
         harap = case["expect"]
-        # expect=null berarti pertanyaan di luar cakupan: hasil yang BENAR adalah
-        # kosong. Ini menguji gerbang relevansi, bukan kemampuan mencari.
-        benar = (judul == []) if harap is None else (harap in judul)
-        if benar:
-            lolos += 1
+        if harap is None:
+            sampah_total += 1
+            if judul != []:
+                sampah_lolos_gerbang += 1
         else:
-            gagal.append((case["q"], harap, judul))
-    return lolos, len(cases), gagal
+            sah_total += 1
+            if harap in judul:
+                sah_lolos += 1
+            else:
+                gagal_sah.append((case["q"], harap, judul))
+    return {
+        "sah_lolos": sah_lolos, "sah_total": sah_total,
+        "sampah_lolos_gerbang": sampah_lolos_gerbang, "sampah_total": sampah_total,
+    }, gagal_sah
 
 
 def main() -> int:
@@ -75,11 +93,16 @@ def main() -> int:
     with psycopg.connect(url, row_factory=dict_row) as conn:
         for nama, path in SET_UJI:
             cases = json.loads(path.read_text(encoding="utf-8"))
-            lolos, total, gagal = _jalankan(conn, cases)
-            print(f"\n[{nama}] recall@{TOP_K}: {lolos}/{total} = {lolos / total:.1%}")
-            for q, expect, dapat in gagal:
-                harap = "(kosong)" if expect is None else expect
-                print(f"  - \"{q}\"\n      harusnya: {harap}\n      dapatnya: {dapat}")
+            r, gagal_sah = _jalankan(conn, cases)
+            sl, st = r["sah_lolos"], r["sah_total"]
+            xl, xt = r["sampah_lolos_gerbang"], r["sampah_total"]
+            print(f"\n[{nama}] recall@{TOP_K} SOAL SAH: {sl}/{st} = {sl / st:.1%}"
+                  if st else f"\n[{nama}] (tidak ada soal sah)")
+            if xt:
+                print(f"          soal sampah lolos gerbang (diserahkan ke LLM, "
+                      f"lihat eval_llm_judge.py): {xl}/{xt} = {xl / xt:.1%}")
+            for q, expect, dapat in gagal_sah:
+                print(f"  - \"{q}\"\n      harusnya: {expect}\n      dapatnya: {dapat}")
 
     print("\nCATATAN: diukur di atas corpus SIMULASI.")
     print("[tuning] dipakai menyetel ambang. Optimistis, JANGAN dilaporkan.")

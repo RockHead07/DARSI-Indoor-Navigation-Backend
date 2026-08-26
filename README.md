@@ -75,29 +75,41 @@ APK; boleh kosong tapi endpoint jadi rentan kalau Bifrost juga gagal),
 ```bash
 python -m scripts.eval_retrieval
 ```
-**Angka yang layak dilaporkan: recall@3 = 71,9%** pada set uji bersih 32 pertanyaan
-(78,6% untuk 28 pertanyaan dalam cakupan). Diukur 2026-08-24 setelah corpus sempat
-berubah bentuk (commit `610f25e`, 25→27 chunk).
+**Angka FINAL (2026-08-26): recall@3 soal sah = 95,8%** (23/24) pada `test-4`,
+set uji disegel yang tidak pernah dipakai memperbaiki apa pun. Diukur terhadap
+corpus 28-chunk yang genuine (lihat koreksi di bawah), setelah `MIN_TOP_SCORE`
+diturunkan ke 0,15 (ADR-036).
 
-⚠️ **Koreksi 2026-08-25:** angka di atas SEBENARNYA diukur terhadap corpus
-**27 chunk**, bukan 28 seperti sempat tertulis di sini. Chunk ke-28 ("Cara
+⚠️ **Koreksi metodologi 2026-08-26:** angka lama (71,9%/78,6%, diukur
+2026-08-24) menggabungkan recall soal sah dengan penolakan soal sampah jadi
+satu persentase. Sejak `MIN_TOP_SCORE` sengaja dilonggarkan dan penyaringan
+sampah diserahkan ke LLM (bukan lagi ke retrieval, lihat ADR-036), angka
+gabungan itu jadi menyesatkan -- `test-4` sempat terbaca 75,0% padahal recall
+soal sahnya sebenarnya 95,8%, cuma tertutup 7 soal sampah yang "gagal" (tidak
+kosong) padahal itu memang perilaku yang diharapkan sekarang. `eval_retrieval.py`
+sudah diperbaiki untuk melaporkan keduanya terpisah.
+
+⚠️ **Koreksi 2026-08-25 (masih berlaku):** angka lama di atas SEBENARNYA
+diukur terhadap corpus **27 chunk**, bukan 28 seperti sempat tertulis di sini. Chunk ke-28 ("Cara
 Membuat Janji Temu Dokter", ditulis di commit `803f2fa`) ternyata **tidak
 pernah ter-ingest ke produksi** — kemungkinan diedit setelah `ingest_corpus.py`
 terakhir dijalankan, dan tidak pernah di-ingest ulang. Baru terdeteksi &
 diperbaiki 2026-08-25 lewat `docker compose exec api python -m
 scripts.ingest_corpus`, dikonfirmasi via query DB langsung (`SELECT count(*)
-FROM knowledge_chunks` = 27 sebelum, 28 sesudah). recall@3 71,9% BELUM diukur
-ulang terhadap corpus 28-chunk yang genuinely jalan sekarang — pelajaran yang
-sama berulang: klaim "sudah di-deploy" butuh bukti eksekusi (query DB),
-bukan cuma "skrip jalan tanpa error".
+FROM knowledge_chunks` = 27 sebelum, 28 sesudah) — pelajaran yang sama
+berulang: klaim "sudah di-deploy" butuh bukti eksekusi (query DB), bukan cuma
+"skrip jalan tanpa error".
 
-Script mencetak **empat** set sekaligus, dan bedanya penting. Tiga set pertama
-sudah "terbakar": kegagalannya pernah dipakai memperbaiki sistem, jadi angkanya
-mengukur kecocokan sistem dengan dirinya sendiri. **Hanya `test-2` yang sah.**
+Script mencetak **enam** set sekaligus (`test-3`/`test-4` ditambahkan
+2026-08-26, lihat `docs/RETRIEVAL-EVALUATION.md` §6), dan bedanya penting.
+Lima set pertama sudah "terbakar" untuk berbagai keperluan (lihat catatan yang
+dicetak skrip untuk masing-masing). **Hanya `test-4` yang belum pernah dipakai
+memperbaiki apa pun** — itu yang layak dilaporkan.
 
-Bukti kenapa ini penting: menambal 4 celah kosakata membuat `test-1` melonjak
-85,7% → **100%**, sementara `test-2` yang bersih tetap **71,9%**. Perbaikannya
-tidak menular. Kalau berhenti di angka 100%, yang dilaporkan adalah angka palsu.
+Bukti kenapa "set terbakar" penting: menambal 4 celah kosakata membuat
+`test-1` melonjak 85,7% → **100%**, sementara `test-2` yang saat itu masih
+bersih tetap **71,9%**. Perbaikannya tidak menular. Kalau berhenti di angka
+100%, yang dilaporkan adalah angka palsu.
 
 ⚠️ **Baca [`docs/RETRIEVAL-EVALUATION.md`](docs/RETRIEVAL-EVALUATION.md) sebelum
 menyetel ambang, mengganti model embedding, atau melaporkan angka apa pun.**
@@ -119,17 +131,18 @@ dijalankan ulang sebagai regression test tiap ada perbaikan, tidak "terbakar"
 seperti `test-2`.
 
 **Terakhir diukur bersih (52/52 dinilai, tanpa error) 2026-08-26: 51/52
-(98,1%).** Ini angka FINAL, bukan lower-bound — menggabungkan SEMUA perbaikan
-yang pernah ditemukan lewat eval ini (kosakata KB, rubrik out-of-scope, chunk
-janji-temu-dokter, WAYFINDING administrasi/BPJS, konsistensi Kasir→Resepsionis).
-Response API sejak run ini juga membawa field `provider` (`bifrost`/`groq`) --
-setiap baris hasil eval mencatatnya, jadi kegagalan intermiten bisa
-dikorelasikan dengan fallback, bukan diduga.
+(98,1%).** Menggabungkan SEMUA perbaikan konten yang pernah ditemukan lewat
+eval ini (kosakata KB, rubrik out-of-scope, chunk janji-temu-dokter, WAYFINDING
+administrasi/BPJS, konsistensi Kasir→Resepsionis). Response API sejak run ini
+juga membawa field `provider` (`bifrost`/`groq`) -- setiap baris hasil eval
+mencatatnya, jadi kegagalan intermiten bisa dikorelasikan dengan fallback,
+bukan diduga.
 
-**1 kegagalan tersisa, akarnya sudah dipahami:** skenario luka-robek/berdarah
-ditolak total oleh gerbang `MIN_TOP_SCORE` (lihat baris tabel di bawah) --
-sengaja belum ditambal, butuh set uji baru. Rincian per kategori di tabel
-parameter di bawah.
+**Satu-satunya kegagalan run itu (luka-robek/berdarah) SUDAH DIPERBAIKI
+setelahnya** lewat ADR-036 (`MIN_TOP_SCORE` 0,22→0,15) — belum diukur ulang
+lewat 52 skenario penuh, tapi diverifikasi individual via curl (lihat ADR-036
+di `docs/DECISIONS.md` repo Unity). Perlu run `eval_llm_judge` sekali lagi
+untuk angka agregat yang mencakup ini + fix `poi_id` bocor saat menolak.
 
 ### Ringkasan parameter & angka terukur
 
@@ -141,19 +154,20 @@ di kertas) — lihat `docs/RETRIEVAL-EVALUATION.md` untuk metodologi lengkap.
 | Model embedding | `paraphrase-multilingual-MiniLM-L12-v2` (384 dim) | mpnet-base (768 dim) diuji, dibatalkan — nol perbaikan terukur, +0,8GB memori |
 | Ukuran corpus | 28 chunk (simulasi) | genuinely 28 sejak 2026-08-25 (lihat koreksi §recall@3 — sempat cuma 27 di produksi tanpa disadari) |
 | Retrieval | Hybrid: pgvector (cosine) + full-text `indonesian` via RRF (k=60) | ambang absolut terbukti tidak layak (cosine tidak terkalibrasi), lihat §evaluasi |
-| Ambang skor (`MIN_TOP_SCORE`) | 0,22 | gerbang HANYA baca skor vector, full-text tidak ikut menentukan lolos/tidak — terbukti 2026-08-25: query dengan kata kunci PERSIS ("robek") tetap tertolak kalau parafrase-nya membuat skor vector di bawah 0,22. 0,15 terukur lebih baik (81,2%) tapi BELUM diterapkan — butuh set uji baru dulu, lihat `RETRIEVAL-EVALUATION.md` §6 |
-| **recall@3 (retrieval murni)** | **71,9%** (32 soal bersih, `test-2`) | diukur 2026-08-24 terhadap corpus yang TERNYATA 27 chunk (lihat koreksi di atas), belum diukur ulang terhadap 28 chunk genuine |
+| Ambang skor (`MIN_TOP_SCORE`) | **0,15** (sejak 2026-08-26, ADR-036) | dulu 0,22 — gerbang HANYA baca skor vector, full-text tidak ikut menentukan lolos/tidak, jadi kata kunci PERSIS ("robek") pun tidak menolong. Diputuskan lewat asimetri biaya (sampah lolos → LLM menolak dgn benar; sah diblokir → penolakan buta ke kasus luka berdarah), bukan cuma kemenangan angka. Detail lengkap: `RETRIEVAL-EVALUATION.md` §6 |
+| **recall@3 soal sah** | **95,8%** (23/24, `test-4`) | diukur 2026-08-26, set disegel, belum pernah dipakai memperbaiki apa pun. Metodologi diperbaiki: TIDAK lagi digabung dengan penolakan soal sampah (lihat `RETRIEVAL-EVALUATION.md` §6) |
 | LLM primer | Bifrost / `medgemma-1.5-4b-it-q4` | gateway eksternal `hcm-lab.id`, tuning domain medis (ADR-029) |
 | LLM fallback | Groq / `openai/gpt-oss-20b` | dipanggil server-side, tidak pernah dari client |
 | Latensi jawaban (Bifrost) | 12-32 detik | reasoning trace medgemma + overhead Cloudflare Tunnel |
 | **eval_llm_judge (end-to-end, 52 skenario)** | **51/52 (98,1%)** | diukur 2026-08-26; FINAL, mencakup semua fix yang pernah ditemukan lewat eval ini |
-| ↳ Gawat Darurat | 9/10 (90%) | 1 kegagalan = korban gerbang `MIN_TOP_SCORE` (akar terkonfirmasi 2026-08-25: gerbang cuma baca skor vector, kata kunci literal pun tidak menolong, lihat baris di atas) — satu-satunya kegagalan tersisa di seluruh suite |
+| ↳ Gawat Darurat | 9/10 (90%) | 1 kegagalan = korban gerbang `MIN_TOP_SCORE` lama (0,22) — **sudah diperbaiki** oleh ADR-036, belum ikut angka agregat run ini |
 | ↳ Poliklinik | 10/10 (100%) | |
 | ↳ Farmasi | 6/6 (100%) | |
 | ↳ Diagnostik | 6/6 (100%) | |
 | ↳ Administrasi | 6/6 (100%) | chunk janji-temu-dokter (tidak ter-ingest) + WAYFINDING administrasi/BPJS + konsistensi Kasir→Resepsionis, semua diperbaiki 2026-08-25/26 |
 | ↳ Fasilitas Umum | 10/10 (100%) | |
-| ↳ Di Luar Cakupan | 4/4 (100%) | lolos run ini; gerbang `MIN_TOP_SCORE` (baris di atas) TIDAK diubah, jadi ini kemungkinan besar kebetulan skor per-query, bukan perbaikan nyata -- jangan diklaim fixed |
+| ↳ Di Luar Cakupan | 4/4 (100%) | lolos di run ini sebelum ambang diturunkan. Diverifikasi ULANG setelah ADR-036 (8/8 pertanyaan sampah tetap ditolak LLM dengan benar) — argumen asimetri gerbang terbukti, bukan kebetulan |
+| `poi_id` saat menolak | **Diperbaiki 2026-08-26** | dulu bocor (mis. "prakiraan cuaca" → `poi_name: IGD`) — makin sering muncul setelah gerbang dilonggarkan. Sekarang LLM menandai penolakan (`[TOLAK]`, dibuang dari teks sebelum sampai ke pengguna), `poi_id`/`poi_name` dipaksa `null` kalau tertandai. Solusi "buang poi kalau namanya tak disebut di teks" DIUJI DAN GUGUR: 4 dari 11 POI resmi tidak pernah muncul apa adanya di jawaban (`Radiology` vs "Radiologi", dll) |
 | Ingress | Cloudflare Named Tunnel permanen | `https://api-darsi.rockhead07.tech`, systemd service, survive restart |
 | Keamanan admin | `POI_SYNC_TOKEN` dirotasi | token acak 48-hex, default lama sudah ditolak (401) |
 
