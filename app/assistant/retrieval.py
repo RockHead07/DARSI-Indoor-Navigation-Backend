@@ -56,7 +56,7 @@ RRF_K = 60
 #
 # test-3 (24 soal sah + 8 sampah): 0.22 -> 21/24 sah, 0.15 -> 24/24 sah.
 # Kalau corpus bertambah, angka ini WAJIB diukur ulang, jangan diasumsikan aman.
-MIN_TOP_SCORE = 0.15    # gerbang relevansi (spec section 8.3, disetel ulang ADR-035)
+MIN_TOP_SCORE = 0.15    # gerbang relevansi (spec section 8.3, disetel ulang ADR-036)
 RELATIVE_RATIO = 0.75   # ambil yang skornya >= 75% skor peringkat 1
 FLOOR_BONUS = 0.05   # tambahan skor kalau chunk selantai dengan user
 BUILDING_BONUS = 0.02
