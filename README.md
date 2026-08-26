@@ -139,10 +139,21 @@ mencatatnya, jadi kegagalan intermiten bisa dikorelasikan dengan fallback,
 bukan diduga.
 
 **Satu-satunya kegagalan run itu (luka-robek/berdarah) SUDAH DIPERBAIKI
-setelahnya** lewat ADR-036 (`MIN_TOP_SCORE` 0,22→0,15) — belum diukur ulang
-lewat 52 skenario penuh, tapi diverifikasi individual via curl (lihat ADR-036
-di `docs/DECISIONS.md` repo Unity). Perlu run `eval_llm_judge` sekali lagi
-untuk angka agregat yang mencakup ini + fix `poi_id` bocor saat menolak.
+setelahnya** lewat ADR-036 (`MIN_TOP_SCORE` 0,22→0,15) — diverifikasi via curl
+DAN via 3 percobaan run 52-skenario susulan (2026-08-26), `#06` PASS di
+**3 dari 3** dan Di Luar Cakupan PASS **4/4 di ketiganya**. Dua fix inti
+(ambang + penanda `[TOLAK]`) terbukti kokoh, bukan kebetulan sekali jalan.
+
+⚠️ **Belum ada satu pun dari 3 run susulan itu yang bersih 52/52** — tiap run
+kena 6-8 kegagalan infrastruktur (`503 Service Unavailable` dari endpoint kita
+sendiri, sekali juga `[WinError 10054]` jaringan lokal), bukan kegagalan
+jawaban. Lihat entri `MIN_TOP_SCORE`/Bifrost di bawah untuk detail dan
+statusnya sebagai utang baru. Dua kegagalan KONTEN nyata yang tersisa (bukan
+infra): jadwal dokter kadang tidak sebut nama poli (`#12`, sudah lama diduga
+variasi sampling), dan "Loket obat racikan di sebelah mana" (`#25`, BARU --
+jawabannya jujur bilang tidak tersedia detailnya, yang sebenarnya benar karena
+corpus memang tidak merinci loket racikan terpisah; prioritas rendah, sama
+kelasnya dengan `#12`).
 
 ### Ringkasan parameter & angka terukur
 
@@ -168,6 +179,7 @@ di kertas) — lihat `docs/RETRIEVAL-EVALUATION.md` untuk metodologi lengkap.
 | ↳ Fasilitas Umum | 10/10 (100%) | |
 | ↳ Di Luar Cakupan | 4/4 (100%) | lolos di run ini sebelum ambang diturunkan. Diverifikasi ULANG setelah ADR-036 (8/8 pertanyaan sampah tetap ditolak LLM dengan benar) — argumen asimetri gerbang terbukti, bukan kebetulan |
 | `poi_id` saat menolak | **Diperbaiki 2026-08-26** | dulu bocor (mis. "prakiraan cuaca" → `poi_name: IGD`) — makin sering muncul setelah gerbang dilonggarkan. Sekarang LLM menandai penolakan (`[TOLAK]`, dibuang dari teks sebelum sampai ke pengguna), `poi_id`/`poi_name` dipaksa `null` kalau tertandai. Solusi "buang poi kalau namanya tak disebut di teks" DIUJI DAN GUGUR: 4 dari 11 POI resmi tidak pernah muncul apa adanya di jawaban (`Radiology` vs "Radiologi", dll) |
+| ⚠️ **Stabilitas Bifrost/jaringan** | **~10-15% gagal di bawah beban** (UTANG BARU 2026-08-26) | Terukur di 3 percobaan eval 52-skenario berturut-turut, masing-masing kena 6-8 kegagalan `503`/koneksi (endpoint kita balas 503 HANYA kalau Bifrost DAN Groq fallback DUA-DUANYA gagal untuk request yang sama, lihat `router.py`). Diagnosis lewat `docker compose logs api` BUNTU -- container tidak mencetak log request/exception ke stdout sama sekali. Belum diselidiki lebih jauh (butuh nambah logging, di luar cakupan sesi ini). Bukan bug RAG, tapi relevan untuk kesiapan lapangan sungguhan. |
 | Ingress | Cloudflare Named Tunnel permanen | `https://api-darsi.rockhead07.tech`, systemd service, survive restart |
 | Keamanan admin | `POI_SYNC_TOKEN` dirotasi | token acak 48-hex, default lama sudah ditolak (401) |
 
