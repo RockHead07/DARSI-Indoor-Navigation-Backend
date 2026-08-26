@@ -34,11 +34,29 @@ RRF_K = 60
 #   2. Rentang relatif. Setelah gerbang lolos, ambil chunk yang skornya masih
 #      dalam RELATIVE_RATIO dari peringkat 1. Ini yang mencegah jawaban benar
 #      terbuang cuma karena skala skor pertanyaan itu memang rendah.
-# 0.22 terukur, bukan ditebak: pertanyaan di luar cakupan "harga tiket pesawat ke
-# jakarta" skor tertingginya 0.205, sementara pertanyaan sah "usg perut perlu puasa
-# tidak" mengenai chunk yang benar di 0.249. Jaraknya tipis (0.044), jadi kalau
-# corpus bertambah, angka ini WAJIB diukur ulang, jangan diasumsikan masih aman.
-MIN_TOP_SCORE = 0.22    # gerbang relevansi (spec section 8.3)
+# 0.15 sejak 2026-08-26 (sebelumnya 0.22), diputuskan dari set uji BARU test-3
+# yang ditulis khusus untuk ini -- test-2 sudah terbakar untuk parameter ini
+# (kegagalannya sudah dipakai belajar bahwa 0.15 lebih baik, lihat
+# RETRIEVAL-EVALUATION.md section 6).
+#
+# Yang menentukan BUKAN kemenangan angka, tapi asimetri biayanya:
+#   - Sampah yang lolos gerbang TIDAK jadi jawaban salah. Dia diteruskan ke LLM
+#     yang menolaknya dengan benar (eval_llm_judge kategori Di Luar Cakupan 4/4).
+#   - Pertanyaan sah yang DIBLOKIR gerbang jadi "Maaf, saya tidak punya
+#     informasi" -- dan di antaranya ada luka berdarah. Itu biaya keselamatan.
+# Satu sisi nyaris tanpa biaya, sisi lain berbiaya nyawa. Jadi lebih baik
+# gerbangnya longgar dan LLM yang menyaring, persis pembagian tugas ADR-026.
+#
+# Terukur, bukan ditebak: "Tangan kena pisau robek berdarah banyak" skornya
+# 0.214, gagal dari 0.22 cuma karena selisih 0.006, dan pasien itu tidak dapat
+# arahan ke IGD sama sekali. "kena air panas melepuh" ada di 0.181. Karena itu
+# 0.18 TIDAK dipakai walau test-3 bilang cukup: marginnya cuma 0.001 dan akan
+# patah begitu corpus berubah sedikit. 0.15 memberi margin nyata sambil tetap
+# menahan yang benar-benar jauh (mis. "resep rendang padang" di 0.090).
+#
+# test-3 (24 soal sah + 8 sampah): 0.22 -> 21/24 sah, 0.15 -> 24/24 sah.
+# Kalau corpus bertambah, angka ini WAJIB diukur ulang, jangan diasumsikan aman.
+MIN_TOP_SCORE = 0.15    # gerbang relevansi (spec section 8.3, disetel ulang ADR-035)
 RELATIVE_RATIO = 0.75   # ambil yang skornya >= 75% skor peringkat 1
 FLOOR_BONUS = 0.05   # tambahan skor kalau chunk selantai dengan user
 BUILDING_BONUS = 0.02

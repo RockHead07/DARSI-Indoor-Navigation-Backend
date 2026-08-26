@@ -40,6 +40,8 @@ SET_UJI = [
     ("dev    ", DATA_DIR / "eval_holdout.json"),
     ("test-1 ", DATA_DIR / "eval_test.json"),
     ("test-2 ", DATA_DIR / "eval_test2.json"),
+    ("test-3 ", DATA_DIR / "eval_test3.json"),
+    ("test-4 ", DATA_DIR / "eval_test4.json"),
 ]
 
 
@@ -83,7 +85,12 @@ def main() -> int:
     print("[tuning] dipakai menyetel ambang. Optimistis, JANGAN dilaporkan.")
     print("[dev]    kegagalannya pernah dipakai memperbaiki corpus. Terbakar.")
     print("[test-1] kegagalannya dipakai menambal 4 celah kosakata. Ikut terbakar.")
-    print("[test-2] belum pernah dipakai memperbaiki apa pun. INI yang dilaporkan.")
+    print("[test-2] terbakar untuk PARAMETER AMBANG (dipakai belajar 0.15 > 0.22),")
+    print("         masih sah untuk mengukur kualitas retrieval secara umum.")
+    print("[test-3] dipakai memilih MIN_TOP_SCORE 2026-08-26. Terbakar sejak itu.")
+    print("[test-4] disegel, ditulis bersamaan test-3 sebelum pengukuran apa pun.")
+    print("         INI angka yang dilaporkan. Sekali dipakai memperbaiki sesuatu,")
+    print("         dia ikut terbakar dan butuh set ke-7.")
     return 0
 
 

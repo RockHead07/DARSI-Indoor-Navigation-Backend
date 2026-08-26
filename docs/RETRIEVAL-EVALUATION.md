@@ -166,22 +166,80 @@ teks chunk-nya (`generation._SYSTEM_PROMPT`), bukan ditentukan angka ambang.
 
 ---
 
-## 6. Temuan: Gerbang Skor Merugikan Lebih Banyak daripada Menolong
+## 6. Gerbang Skor: dari 0,22 ke 0,15 (DITERAPKAN 2026-08-26)
 
-Sweep nilai gerbang terhadap `test-2`:
+### 6.1. Pengukuran lama (2026-08-2x) dan koreksinya
 
-| MIN_TOP_SCORE | recall@3 |
-|---|---|
-| 0,22 (dipakai sekarang) | 71,9% |
-| **0,15** | **81,2%** |
-| 0,00 (tanpa gerbang) | 78,1% |
+Sweep awal terhadap `test-2` mencatat 0,22 → 71,9% dan 0,15 → 81,2%, dengan klaim
+gerbang memblokir **4 pertanyaan sah**: "kena air panas melepuh", "tangan keseleo
+mau dilihat tulangnya", "pengen beli minum", "ada yang nganter jenazah ga".
 
-Pada 0,22, gerbang memblokir **4 pertanyaan yang sah** ("kena air panas melepuh",
-"tangan keseleo mau dilihat tulangnya", "pengen beli minum", "ada yang nganter
-jenazah ga") sambil tetap **meloloskan 3 pertanyaan sampah**.
+**Klaim itu sekarang BASI, dan ini penting supaya tidak dikutip lagi.** Diukur
+ulang 2026-08-26 terhadap corpus 28-chunk:
 
-**Belum diterapkan.** Menurunkannya berdasarkan `test-2` akan membakar set itu
-juga, persis kesalahan yang dijelaskan di §4. Perlu set uji ke-5 untuk memvalidasi.
+| pertanyaan | skor cosine | status di ambang 0,22 |
+|---|---|---|
+| "kena air panas melepuh" | 0,181 | masih diblokir |
+| "tangan saya keseleo mau dilihat tulangnya" | 0,308 | **sudah lolos** |
+| "pengen beli minum" | 0,330 | **sudah lolos** |
+| "ada yang nganter jenazah ga" | 0,268 | **sudah lolos** |
+
+Tiga dari empat sudah selesai dengan sendirinya lewat perkayaan corpus. Selisih
+0,22 vs 0,15 di `test-2` juga menyusut dari +9,3 poin jadi **+3,1 poin**. Alasan
+menurunkan ambang ternyata **lebih lemah** dari yang tertulis di versi lama.
+
+### 6.2. Temuan yang sebenarnya menentukan: gerbangnya nyaris tidak menyaring
+
+Sweep 2026-08-26 memisahkan recall soal sah dari penolakan soal sampah, karena
+satu angka gabungan menyembunyikan pertukaran di antara keduanya (dan nilainya
+bergeser mengikuti proporsi soal sampah di tiap set, jadi tidak bisa dibandingkan
+antar-set).
+
+Penolakan soal sampah pada ambang 0,22: `test-3` **1/8**, `test-4` 2/8,
+`test-2` 1/4, `dev` 1/3. Gerbang ini **bukan filter, ini kebocoran**. Konsisten
+dengan §5: cosine memang tidak terkalibrasi untuk memisahkan dalam/luar cakupan.
+
+### 6.3. Asimetri biaya, dasar keputusan yang sesungguhnya
+
+Keputusan **tidak** diambil dari kemenangan angka, melainkan dari biaya salah
+di kedua arah, yang ternyata berat sebelah:
+
+- **Sampah yang lolos gerbang tidak menghasilkan jawaban salah.** Dia diteruskan
+  ke LLM, yang menolaknya dengan benar. Terbukti terukur: `eval_llm_judge`
+  kategori Di Luar Cakupan **4/4** pada run final. Biayanya nyaris nol.
+- **Pertanyaan sah yang diblokir gerbang menghasilkan "Maaf, saya tidak punya
+  informasi"**, dan di antaranya ada "Tangan kena pisau robek berdarah banyak"
+  (skor **0,214**, gagal dari 0,22 cuma karena selisih **0,006**). Pasien luka
+  berdarah tidak dapat arahan ke IGD sama sekali. Itu biaya keselamatan.
+
+Jadi lebih baik gerbangnya longgar dan LLM yang menyaring, persis pembagian
+tugas yang sudah diputuskan ADR-026.
+
+### 6.4. Kenapa 0,15, bukan 0,18
+
+`test-3` (24 soal sah + 8 sampah) di ambang ≤0,18 memberi recall soal sah
+**24/24 (100%)**, turun ke 21/24 di 0,20. Jadi test-3 sendiri bilang 0,18 sudah
+cukup. **0,18 tetap ditolak**: "kena air panas melepuh" ada di 0,181, marginnya
+cuma 0,001 dan akan patah begitu corpus berubah sedikit. 0,15 memberi margin
+nyata sambil tetap menahan yang benar-benar jauh ("resep rendang padang" 0,090).
+
+### 6.5. Bukti tandingan, dicatat apa adanya
+
+`test-4` (set disegel) **tidak mendukung** perubahan ini. Soal sahnya 23/24 baik
+di 0,15 maupun 0,22, sementara penolakan sampahnya justru lebih baik di 0,22
+(2/8 vs 1/8). Set segel bersikap netral-condong-menolak.
+
+Perubahan ini berdiri di atas argumen asimetri §6.3, **bukan** di atas
+kemenangan angka di set uji. Siapa pun yang mencabutnya nanti harus membantah
+asimetri itu, bukan sekadar menunjuk tabel.
+
+### 6.6. Opsi yang dibatalkan
+
+Sempat dipertimbangkan membuat full-text ikut membuka gerbang (temuan: gerbang
+cuma membaca skor vector, jadi kecocokan kata literal seperti "robek" pun tidak
+menolong). **Dibatalkan berdasarkan data**: pada 0,15 recall soal sah `test-3`
+sudah 100%, tidak ada sisa yang bisa diperbaiki opsi itu. Menambah logika untuk
+keuntungan terukur nol adalah YAGNI.
 
 ---
 
