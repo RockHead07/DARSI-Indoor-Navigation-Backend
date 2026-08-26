@@ -118,13 +118,18 @@ seperti retrieval — skenarionya tetap (fixed list di skrip), jadi boleh
 dijalankan ulang sebagai regression test tiap ada perbaikan, tidak "terbakar"
 seperti `test-2`.
 
-**Terakhir diukur bersih (52/52 dinilai, tanpa error) 2026-08-25: 46/52
-(88,5%).** Ini run kedua, menggabungkan 2 perbaikan (kosakata "spiral KB",
-rubrik penolakan out-of-scope) yang sebelumnya cuma diverifikasi individual.
-Angka ini SENDIRI juga **lower-bound**: 1 perbaikan lagi (chunk "Cara Janji
-Temu Dokter" yang ternyata belum ter-ingest ke produksi, lihat §recall@3 di
-atas) di-deploy SETELAH run ini, cuma diverifikasi manual lewat curl. Rincian
-per kategori dan daftar 6 kegagalan ada di tabel parameter di bawah.
+**Terakhir diukur bersih (52/52 dinilai, tanpa error) 2026-08-26: 51/52
+(98,1%).** Ini angka FINAL, bukan lower-bound — menggabungkan SEMUA perbaikan
+yang pernah ditemukan lewat eval ini (kosakata KB, rubrik out-of-scope, chunk
+janji-temu-dokter, WAYFINDING administrasi/BPJS, konsistensi Kasir→Resepsionis).
+Response API sejak run ini juga membawa field `provider` (`bifrost`/`groq`) --
+setiap baris hasil eval mencatatnya, jadi kegagalan intermiten bisa
+dikorelasikan dengan fallback, bukan diduga.
+
+**1 kegagalan tersisa, akarnya sudah dipahami:** skenario luka-robek/berdarah
+ditolak total oleh gerbang `MIN_TOP_SCORE` (lihat baris tabel di bawah) --
+sengaja belum ditambal, butuh set uji baru. Rincian per kategori di tabel
+parameter di bawah.
 
 ### Ringkasan parameter & angka terukur
 
@@ -141,14 +146,14 @@ di kertas) — lihat `docs/RETRIEVAL-EVALUATION.md` untuk metodologi lengkap.
 | LLM primer | Bifrost / `medgemma-1.5-4b-it-q4` | gateway eksternal `hcm-lab.id`, tuning domain medis (ADR-029) |
 | LLM fallback | Groq / `openai/gpt-oss-20b` | dipanggil server-side, tidak pernah dari client |
 | Latensi jawaban (Bifrost) | 12-32 detik | reasoning trace medgemma + overhead Cloudflare Tunnel |
-| **eval_llm_judge (end-to-end, 52 skenario)** | **46/52 (88,5%)** | diukur 2026-08-25; lower-bound, mendahului 1 perbaikan terbaru (chunk janji-temu, lihat rincian kategori) |
-| ↳ Gawat Darurat | 9/10 (90%) | 1 kegagalan = korban gerbang `MIN_TOP_SCORE` (akar terkonfirmasi 2026-08-25, sengaja belum ditambal) |
-| ↳ Poliklinik | 8/10 (80%) | 2 gagal: jadwal dokter anak tidak sebut nama poli — diduga variasi sampling LLM, bukan bug kode |
+| **eval_llm_judge (end-to-end, 52 skenario)** | **51/52 (98,1%)** | diukur 2026-08-26; FINAL, mencakup semua fix yang pernah ditemukan lewat eval ini |
+| ↳ Gawat Darurat | 9/10 (90%) | 1 kegagalan = korban gerbang `MIN_TOP_SCORE` (akar terkonfirmasi 2026-08-25: gerbang cuma baca skor vector, kata kunci literal pun tidak menolong, lihat baris di atas) — satu-satunya kegagalan tersisa di seluruh suite |
+| ↳ Poliklinik | 10/10 (100%) | |
 | ↳ Farmasi | 6/6 (100%) | |
 | ↳ Diagnostik | 6/6 (100%) | |
-| ↳ Administrasi | 4/6 (67%) | 2 gagal: rujukan BPJS tidak sebut Resepsionis (belum diselidiki); chunk janji-temu-dokter tidak ter-ingest ke produksi — **diperbaiki & diverifikasi 2026-08-25**, belum ikut angka agregat ini |
+| ↳ Administrasi | 6/6 (100%) | chunk janji-temu-dokter (tidak ter-ingest) + WAYFINDING administrasi/BPJS + konsistensi Kasir→Resepsionis, semua diperbaiki 2026-08-25/26 |
 | ↳ Fasilitas Umum | 10/10 (100%) | |
-| ↳ Di Luar Cakupan | 3/4 (75%) | 1 gagal = `poi_id` tetap ke-isi walau jawaban teks benar menolak (gejala `MIN_TOP_SCORE` yang sama) |
+| ↳ Di Luar Cakupan | 4/4 (100%) | lolos run ini; gerbang `MIN_TOP_SCORE` (baris di atas) TIDAK diubah, jadi ini kemungkinan besar kebetulan skor per-query, bukan perbaikan nyata -- jangan diklaim fixed |
 | Ingress | Cloudflare Named Tunnel permanen | `https://api-darsi.rockhead07.tech`, systemd service, survive restart |
 | Keamanan admin | `POI_SYNC_TOKEN` dirotasi | token acak 48-hex, default lama sudah ditolak (401) |
 
