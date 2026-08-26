@@ -69,3 +69,20 @@ def test_tanpa_konteks_sama_sekali_menolak_tanpa_memanggil_llm():
 
 def test_pesan_penolakan_tersedia_dan_jujur():
     assert "tidak" in NO_CONTEXT_ANSWER.lower()
+
+
+def test_split_refusal_membuang_penanda_dari_mana_pun():
+    from app.assistant.generation import split_refusal
+
+    # ujung, bentuk normal
+    teks, tolak = split_refusal("Maaf, di luar cakupan. [TOLAK]")
+    assert tolak is True and "TOLAK" not in teks and teks == "Maaf, di luar cakupan."
+
+    # varian huruf/spasi, dan bukan di ujung -- penanda internal tidak boleh
+    # sampai terbaca pengguna di posisi mana pun
+    teks, tolak = split_refusal("[ tolak ] Maaf, tidak ada infonya.")
+    assert tolak is True and "tolak" not in teks.lower()
+
+    # jawaban sah tidak boleh ikut tertandai
+    teks, tolak = split_refusal("Segera menuju IGD di Lantai 1.")
+    assert tolak is False and teks == "Segera menuju IGD di Lantai 1."

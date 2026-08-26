@@ -16,10 +16,19 @@ dari client). Prinsip yang sama berlaku untuk BIFROST_API_KEY.
 """
 
 import os
+import re
 
 import httpx
 
 from app.assistant.models import RetrievedChunk, ScheduleRow
+
+# Penanda yang diminta ditulis LLM saat dia menolak menjawab (lihat _SYSTEM_PROMPT).
+# Kenapa bertanya ke LLM alih-alih menebak dari prosanya: cuma LLM yang tahu pasti
+# dia menolak atau menjawab, sementara menebak dari kata kunci terbukti rapuh --
+# di produksi saja variannya sudah "Maaf", "Mohon maaf", "tidak tersedia", dan
+# "hanya melayani". Pola yang sama dengan ADR-021: satu pemilik sah, sisanya
+# diturunkan, bukan ditebak ulang oleh pihak lain.
+REFUSAL_MARKER = "[TOLAK]"
 
 # Bifrost: gateway eksternal (bukan service Docker lokal), auth via header
 # "x-api-key" (bukan "Authorization: Bearer" seperti Groq -- format gateway ini
@@ -55,6 +64,7 @@ Aturan:
 - WAYFINDING & LOKASI: Jika pertanyaan menanyakan tempat, fasilitas, jadwal praktek dokter/poliklinik, ATAU prosedur administrasi/pendaftaran (misal toilet, farmasi, kasir, radiologi, rontgen, musholla, kantin, lift, parkir mobil/motor, jadwal dokter, poli, daftar berobat, rujukan BPJS, syarat/berlaku rujukan, janji temu dokter), sebutkan nama lokasi dan lantainya dengan jelas di awal atau akhir jawaban -- termasuk lantai poli kalau informasinya tersedia di JADWAL PRAKTEK DOKTER.
 - Jika informasinya tidak cukup, katakan terus terang dan arahkan ke petugas Informasi di Lantai 1.
 - Pertanyaan di luar urusan rumah sakit (resep masakan, cuaca, jadwal kereta, dll): tolak dengan santun dan tegaskan kamu hanya melayani informasi RS Islam A. Yani. JANGAN sebutkan nama lokasi/lantai/POI apa pun (misal "Lantai 1", "petugas Informasi") di jawaban penolakan ini -- itu cuma relevan untuk pertanyaan yang sungguhan tentang RS.
+- PENANDA PENOLAKAN: setiap kali kamu MENOLAK menjawab -- entah karena pertanyaannya di luar urusan RS, entah karena informasinya memang tidak ada di atas -- akhiri jawabanmu dengan tepat: [TOLAK]. Kalau kamu BENAR-BENAR menjawab pertanyaannya (walau jawabannya singkat), JANGAN tulis [TOLAK].
 - Jawab ringkas, jelas, dan santun dalam Bahasa Indonesia, maksimal 3 kalimat.
 - Jangan menyebutkan ID teknis atau istilah kode internal kepada pengguna."""
 
@@ -92,6 +102,19 @@ def build_prompt(
     bagian.append(f"PERTANYAAN: {user_text}")
     bagian.append("JAWABAN:")
     return "\n".join(bagian)
+
+
+def split_refusal(answer: str) -> tuple[str, bool]:
+    """Pisahkan penanda penolakan dari teks yang dilihat pengguna.
+
+    Dibuang dari MANA PUN di dalam teks, bukan cuma dari ujungnya: kalau LLM
+    menaruhnya di tempat lain, penanda internal itu tidak boleh sampai terbaca
+    pengguna. Toleran terhadap beda huruf besar/kecil dan spasi di dalam kurung.
+    """
+    pola = re.compile(r"\[\s*TOLAK\s*\]", re.IGNORECASE)
+    if not pola.search(answer):
+        return answer, False
+    return pola.sub("", answer).strip(), True
 
 
 def generate_answer(prompt: str) -> tuple[str, str]:

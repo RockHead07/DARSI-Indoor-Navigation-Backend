@@ -34,6 +34,12 @@ class AssistantQueryResponse(BaseModel):
     # kegagalan yang cuma muncul saat fallback ke Groq tidak bisa diaudit dari
     # luar, cuma bisa diduga (lihat eval_llm_judge.py KOREKSI poin 3).
     provider: str | None = None
+    # True kalau asisten MENOLAK menjawab (di luar cakupan, atau informasinya
+    # tidak ada). Saat true, poi_id/poi_name dipastikan None: retrieval tetap
+    # mengembalikan chunk peringkat 1 walau jawabannya menolak, dan tanpa
+    # penjagaan ini klien bisa menyalakan rute ke POI yang sama sekali tidak
+    # ada hubungannya dengan pertanyaan (terukur: "prakiraan cuaca" -> IGD).
+    refused: bool = False
 
 
 @dataclass
