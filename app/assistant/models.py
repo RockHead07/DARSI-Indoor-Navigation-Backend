@@ -42,6 +42,17 @@ class AssistantQueryResponse(BaseModel):
     refused: bool = False
 
 
+class AssistantTTSRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)
+    voice: str = "id-ID-GadisNeural"
+
+
+class AssistantTTSResponse(BaseModel):
+    audio_url: str
+    engine_used: str  # "edge-tts" | "sherpa-onnx"
+
+
+
 @dataclass
 class RetrievedChunk:
     content: str

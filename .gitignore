@@ -18,3 +18,8 @@ Thumbs.db
 # Cache bobot model fastembed — jangan pernah ikut ke git (ratusan MB)
 .fastembed_cache/
 
+# Audio TTS yang dihasilkan runtime
+static/tts/*.mp3
+static/tts/*.wav
+test_gadis.mp3
+

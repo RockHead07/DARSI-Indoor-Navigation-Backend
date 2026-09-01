@@ -19,8 +19,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application source code
 COPY . .
 
-# Create cache directory for FastEmbed weights
-RUN mkdir -p /app/.fastembed_cache
+# Create cache directory for FastEmbed weights and static TTS output
+RUN mkdir -p /app/.fastembed_cache /app/static/tts
 
 EXPOSE 8000
 

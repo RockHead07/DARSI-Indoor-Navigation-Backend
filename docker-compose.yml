@@ -44,11 +44,14 @@ services:
       BIFROST_API_KEY: ${BIFROST_API_KEY}
       GROQ_API_KEY: ${GROQ_API_KEY}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      TTS_BASE_URL: ${TTS_BASE_URL:-}
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
       - fastembed_cache:/app/.fastembed_cache
+      - tts_cache:/app/static/tts
 
 volumes:
   pgdata:
   fastembed_cache:
+  tts_cache:

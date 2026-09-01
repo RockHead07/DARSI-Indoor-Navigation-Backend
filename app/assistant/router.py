@@ -1,4 +1,4 @@
-"""Endpoint POST /api/assistant/query."""
+import os
 
 from fastapi import APIRouter, HTTPException, Request
 
@@ -11,10 +11,13 @@ from app.assistant.generation import (
 from app.assistant.models import (
     AssistantQueryRequest,
     AssistantQueryResponse,
+    AssistantTTSRequest,
+    AssistantTTSResponse,
     Source,
     derive_poi,
 )
 from app.assistant.retrieval import find_schedules, search_chunks
+from app.assistant.tts import STATIC_TTS_DIR, synthesize_speech
 
 router = APIRouter(prefix="/api/assistant", tags=["assistant"])
 
@@ -78,3 +81,29 @@ def query(payload: AssistantQueryRequest, request: Request) -> AssistantQueryRes
         provider=provider,
         refused=refused,
     )
+
+
+@router.post("/tts", response_model=AssistantTTSResponse)
+async def tts(payload: AssistantTTSRequest, request: Request) -> AssistantTTSResponse:
+    """Endpoint sintesis suara TTS (ADR-033).
+
+    Menerima teks dan voice (default: id-ID-GadisNeural). Mengembalikan audio_url
+    dan identifier engine_used ('edge-tts' atau 'sherpa-onnx').
+    """
+    try:
+        filename, engine_used = await synthesize_speech(
+            text=payload.text,
+            voice=payload.voice,
+            output_dir=STATIC_TTS_DIR,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    base = os.environ.get("TTS_BASE_URL", "").rstrip("/") or str(request.base_url).rstrip("/")
+    audio_url = f"{base}/static/tts/{filename}"
+
+    return AssistantTTSResponse(
+        audio_url=audio_url,
+        engine_used=engine_used,
+    )
+

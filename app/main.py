@@ -21,9 +21,11 @@ No response ever includes a distance/meter field — deliberate (ADR-007).
 
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from psycopg_pool import ConnectionPool
 from psycopg.rows import dict_row
 from pydantic import BaseModel
@@ -111,6 +113,12 @@ app.add_middleware(
 )
 
 app.include_router(assistant_router)
+
+# Direktori static untuk file audio TTS dan aset statis lainnya
+STATIC_DIR = Path(os.environ.get("STATIC_DIR", "static"))
+STATIC_TTS_DIR = STATIC_DIR / "tts"
+STATIC_TTS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 
