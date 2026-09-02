@@ -13,11 +13,12 @@ from app.assistant.models import (
     AssistantQueryResponse,
     AssistantTTSRequest,
     AssistantTTSResponse,
+    KataTiming,
     Source,
     derive_poi,
 )
 from app.assistant.retrieval import find_schedules, search_chunks
-from app.assistant.tts import STATIC_TTS_DIR, synthesize_speech
+from app.assistant.tts import DEFAULT_VOICE, STATIC_TTS_DIR, synthesize_speech
 
 router = APIRouter(prefix="/api/assistant", tags=["assistant"])
 
@@ -87,13 +88,16 @@ def query(payload: AssistantQueryRequest, request: Request) -> AssistantQueryRes
 async def tts(payload: AssistantTTSRequest, request: Request) -> AssistantTTSResponse:
     """Endpoint sintesis suara TTS (ADR-033).
 
-    Menerima teks dan voice (default: id-ID-GadisNeural). Mengembalikan audio_url
-    dan identifier engine_used ('edge-tts' atau 'sherpa-onnx').
+    Menerima teks dan voice opsional (kosong = DEFAULT_VOICE). Mengembalikan
+    audio_url, engine_used ('edge-tts' atau 'sherpa-onnx'), dan words berisi batas
+    waktu per kata untuk lip-sync (Amandemen 033-B).
+
+    words KOSONG saat engine_used == 'sherpa-onnx' -- itu kondisi normal, bukan error.
     """
     try:
-        filename, engine_used = await synthesize_speech(
+        filename, engine_used, words = await synthesize_speech(
             text=payload.text,
-            voice=payload.voice,
+            voice=payload.voice or DEFAULT_VOICE,
             output_dir=STATIC_TTS_DIR,
         )
     except Exception as e:
@@ -105,5 +109,6 @@ async def tts(payload: AssistantTTSRequest, request: Request) -> AssistantTTSRes
     return AssistantTTSResponse(
         audio_url=audio_url,
         engine_used=engine_used,
+        words=[KataTiming(**w) for w in words],
     )
 

@@ -44,12 +44,27 @@ class AssistantQueryResponse(BaseModel):
 
 class AssistantTTSRequest(BaseModel):
     text: str = Field(min_length=1, max_length=1000)
-    voice: str = "id-ID-GadisNeural"
+    # Kosong berarti pakai DEFAULT_VOICE di tts.py. Sengaja TIDAK menyalin nama
+    # suara ke sini: kalau ditulis di dua tempat, salinannya pasti melenceng suatu
+    # saat (pola yang sama dengan ADR-021).
+    voice: str | None = None
+
+
+class KataTiming(BaseModel):
+    """Batas waktu satu kata di dalam audio, dalam DETIK dari awal klip."""
+
+    text: str
+    start: float
+    end: float
 
 
 class AssistantTTSResponse(BaseModel):
     audio_url: str
     engine_used: str  # "edge-tts" | "sherpa-onnx"
+    # Batas waktu per kata untuk lip-sync berbasis teks (Amandemen 033-B).
+    # KOSONG untuk engine sherpa-onnx: Tier 2 tidak menghasilkan timing sama sekali.
+    # Klien WAJIB tetap berfungsi saat list ini kosong, bukan menganggapnya error.
+    words: list[KataTiming] = []
 
 
 

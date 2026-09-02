@@ -13,6 +13,7 @@ memanfaatkan cache disk (0 overhead sintesis ulang).
 
 import asyncio
 import hashlib
+import json
 import os
 from pathlib import Path
 
@@ -22,7 +23,12 @@ try:
 except ImportError:
     sherpa_onnx = None  # type: ignore
 
-DEFAULT_VOICE = "id-ID-GadisNeural"
+# Suara multilingual Microsoft. Dipilih setelah uji dengar berdampingan melawan
+# id-ID-GadisNeural: terdengar lebih hangat/natural untuk pemandu RS (Amandemen 033-B).
+# Ini KONFIGURASI, bukan keputusan permanen -- kalau suatu saat suara di luar locale
+# aslinya bermasalah untuk Bahasa Indonesia, kembalikan ke "id-ID-GadisNeural" cukup
+# dengan mengubah baris ini (atau kirim `voice` lain per permintaan).
+DEFAULT_VOICE = "pt-BR-ThalitaMultilingualNeural"
 STATIC_TTS_DIR = Path(os.environ.get("TTS_OUTPUT_DIR", "static/tts"))
 EDGE_TTS_TIMEOUT_SECONDS = int(os.environ.get("EDGE_TTS_TIMEOUT_SECONDS", "15"))
 
@@ -41,13 +47,56 @@ def get_audio_hash(text: str, voice: str) -> str:
     return hashlib.sha256(payload).hexdigest()[:16]
 
 
-async def _synthesize_edge_tts(text: str, voice: str, output_path: Path) -> None:
-    """Tier 1: Sintesis suara menggunakan Microsoft Edge Neural Voice."""
-    communicate = edge_tts.Communicate(text, voice)
-    await asyncio.wait_for(
-        communicate.save(str(output_path)),
-        timeout=EDGE_TTS_TIMEOUT_SECONDS,
-    )
+async def _synthesize_edge_tts(text: str, voice: str, output_path: Path) -> list[dict]:
+    """Tier 1: Sintesis suara menggunakan Microsoft Edge Neural Voice.
+
+    Mengembalikan daftar batas waktu per kata (Amandemen 033-B). Dipakai klien untuk
+    menggerakkan lip-sync dari TEKS, bukan dari menebak vokal lewat spektrum audio --
+    pendekatan lama terukur menampilkan vokal yang tidak ada di kata yang diucapkan
+    pada 59,5% frame.
+
+    `boundary="WordBoundary"` WAJIB eksplisit: default pustaka edge-tts adalah
+    "SentenceBoundary" dan keduanya saling meniadakan, jadi tanpa baris ini yang
+    keluar cuma batas kalimat (terverifikasi langsung, bukan asumsi).
+    """
+    communicate = edge_tts.Communicate(text, voice, boundary="WordBoundary")
+    kata: list[dict] = []
+
+    async def _kumpulkan() -> None:
+        with open(output_path, "wb") as f:
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    f.write(chunk["data"])
+                elif chunk["type"] == "WordBoundary":
+                    # Satuan asalnya tick 100 ns; dikonversi ke detik di sini supaya
+                    # klien tidak perlu tahu satuan internal Microsoft.
+                    kata.append(
+                        {
+                            "text": chunk["text"],
+                            "start": round(chunk["offset"] / 1e7, 4),
+                            "end": round((chunk["offset"] + chunk["duration"]) / 1e7, 4),
+                        }
+                    )
+
+    await asyncio.wait_for(_kumpulkan(), timeout=EDGE_TTS_TIMEOUT_SECONDS)
+    return kata
+
+
+def _path_timings(audio_path: Path) -> Path:
+    """Sidecar JSON berisi batas kata, bersebelahan dengan file audionya."""
+    return audio_path.with_suffix(".json")
+
+
+def _baca_timings(audio_path: Path) -> list[dict]:
+    """Baca sidecar timings kalau ada. Ketiadaannya BUKAN error: audio dari Tier 2
+    memang tidak punya batas kata, dan klien wajib tetap berfungsi tanpa itu."""
+    p = _path_timings(audio_path)
+    if not p.exists():
+        return []
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return []
 
 
 def _get_sherpa_tts():
@@ -97,10 +146,16 @@ async def synthesize_speech(
     text: str,
     voice: str = DEFAULT_VOICE,
     output_dir: Path | None = None,
-) -> tuple[str, str]:
+) -> tuple[str, str, list[dict]]:
     """Sintesis ucapan dari teks menggunakan mekanisme 2-Tier Fallback.
 
-    Mengembalikan tuple (filename, engine_used).
+    Mengembalikan tuple (filename, engine_used, words).
+
+    `words` berisi batas waktu per kata untuk Tier 1 (Amandemen 033-B), dan **list
+    kosong untuk Tier 2** -- sherpa-onnx tidak menghasilkan timing sama sekali. Itu
+    kondisi normal, bukan kegagalan: klien wajib punya jalur lip-sync cadangan yang
+    tidak bergantung timing (lihat catatan di Amandemen 033-B).
+
     Jika file audio dengan hash teks & voice sudah ada di disk, langsung dikembalikan (cache).
     """
     if not text or not text.strip():
@@ -115,28 +170,39 @@ async def synthesize_speech(
 
     # 1. Cek Cache Disk
     if mp3_path.exists() and mp3_path.stat().st_size > 0:
-        return f"{file_base}.mp3", "edge-tts"
+        return f"{file_base}.mp3", "edge-tts", _baca_timings(mp3_path)
     if wav_path.exists() and wav_path.stat().st_size > 0:
-        return f"{file_base}.wav", "sherpa-onnx"
+        return f"{file_base}.wav", "sherpa-onnx", []
 
     e_edge: Exception | None = None
     e_sherpa: Exception | None = None
 
     # 2. Tier 1: Coba Edge-TTS
     try:
-        await _synthesize_edge_tts(text.strip(), voice, mp3_path)
+        kata = await _synthesize_edge_tts(text.strip(), voice, mp3_path)
         if mp3_path.exists() and mp3_path.stat().st_size > 0:
-            return f"{file_base}.mp3", "edge-tts"
+            # Sidecar ditulis SETELAH audio terbukti jadi, supaya tidak pernah ada
+            # timings yatim yang menunjuk file audio yang gagal dibuat.
+            try:
+                _path_timings(mp3_path).write_text(
+                    json.dumps(kata, ensure_ascii=False), encoding="utf-8"
+                )
+            except Exception:
+                # Gagal menulis sidecar tidak boleh menjatuhkan audio yang sudah jadi;
+                # klien cukup jatuh ke lip-sync tanpa timing.
+                pass
+            return f"{file_base}.mp3", "edge-tts", kata
     except Exception as exc:
         e_edge = exc
         if mp3_path.exists():
             mp3_path.unlink(missing_ok=True)
+        _path_timings(mp3_path).unlink(missing_ok=True)
 
-    # 3. Tier 2: Fallback ke Sherpa-ONNX Offline
+    # 3. Tier 2: Fallback ke Sherpa-ONNX Offline (tidak menghasilkan timing kata)
     try:
         _synthesize_sherpa_onnx(text.strip(), wav_path)
         if wav_path.exists() and wav_path.stat().st_size > 0:
-            return f"{file_base}.wav", "sherpa-onnx"
+            return f"{file_base}.wav", "sherpa-onnx", []
     except Exception as exc:
         e_sherpa = exc
         if wav_path.exists():

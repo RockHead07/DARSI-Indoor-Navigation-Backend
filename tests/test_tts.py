@@ -41,9 +41,12 @@ def temp_tts_dir(tmp_path):
 
 
 def test_request_model_validasi_dan_default():
-    # Validasi default voice dan batasan panjang teks
+    # voice sengaja None di model request, BUKAN menyalin DEFAULT_VOICE ke sini.
+    # Nama suara default punya satu pemilik saja (tts.DEFAULT_VOICE); kalau ditulis
+    # di dua tempat, salinannya pasti melenceng suatu saat (pola ADR-021).
+    # Penerapan default-nya diuji terpisah di test_endpoint_tts_voice_kosong_memakai_default.
     req = AssistantTTSRequest(text="Halo ini uji coba")
-    assert req.voice == DEFAULT_VOICE
+    assert req.voice is None
     assert req.text == "Halo ini uji coba"
 
     with pytest.raises(ValidationError):
@@ -79,9 +82,11 @@ async def test_caching_audio_tidak_sintesis_ulang(temp_tts_dir):
 
     with patch("app.assistant.tts._synthesize_edge_tts") as mock_edge, \
          patch("app.assistant.tts._synthesize_sherpa_onnx") as mock_sherpa:
-        filename, engine = await synthesize_speech(text, voice=voice, output_dir=temp_tts_dir)
+        filename, engine, words = await synthesize_speech(text, voice=voice, output_dir=temp_tts_dir)
         assert filename == f"{file_base}.mp3"
         assert engine == "edge-tts"
+        # Cache tanpa sidecar timings: bukan error, sekadar tidak ada timing.
+        assert words == []
         mock_edge.assert_not_called()
         mock_sherpa.assert_not_called()
 
@@ -95,13 +100,17 @@ async def test_synthesize_tier1_edge_tts_sukses(temp_tts_dir):
 
     async def fake_edge_tts(t, v, out_path):
         out_path.write_bytes(b"fake edge tts mp3")
+        return [{"text": "Tes", "start": 0.1, "end": 0.4}]
 
     with patch("app.assistant.tts._synthesize_edge_tts", side_effect=fake_edge_tts) as mock_edge:
-        filename, engine = await synthesize_speech(text, voice=voice, output_dir=temp_tts_dir)
+        filename, engine, words = await synthesize_speech(text, voice=voice, output_dir=temp_tts_dir)
         assert filename == f"{file_base}.mp3"
         assert engine == "edge-tts"
         assert expected_path.exists()
         assert expected_path.read_bytes() == b"fake edge tts mp3"
+        assert words == [{"text": "Tes", "start": 0.1, "end": 0.4}]
+        # Sidecar timings ikut tertulis supaya cache berikutnya tetap punya timing.
+        assert (temp_tts_dir / f"{file_base}.json").exists()
         mock_edge.assert_called_once()
 
 
@@ -117,11 +126,14 @@ async def test_fallback_ke_tier2_sherpa_onnx_saat_edge_tts_gagal(temp_tts_dir):
 
     with patch("app.assistant.tts._synthesize_edge_tts", side_effect=RuntimeError("Edge-TTS connection timeout")), \
          patch("app.assistant.tts._synthesize_sherpa_onnx", side_effect=fake_sherpa) as mock_sherpa:
-        filename, engine = await synthesize_speech(text, voice=voice, output_dir=temp_tts_dir)
+        filename, engine, words = await synthesize_speech(text, voice=voice, output_dir=temp_tts_dir)
         assert filename == f"{file_base}.wav"
         assert engine == "sherpa-onnx"
         assert expected_path.exists()
         assert expected_path.read_bytes() == b"fake sherpa onnx wav"
+        # Tier 2 TIDAK menghasilkan timing. Ini kontrak yang dipegang klien
+        # (Amandemen 033-B): list kosong, bukan error, bukan None.
+        assert words == []
         mock_sherpa.assert_called_once()
 
 
@@ -150,7 +162,7 @@ def test_endpoint_tts_sukses_mengembalikan_audio_url_dan_engine(client):
         file_base = get_audio_hash(text, voice)
         target = output_dir / f"{file_base}.mp3"
         target.write_bytes(b"ID3dummy")
-        return f"{file_base}.mp3", "edge-tts"
+        return f"{file_base}.mp3", "edge-tts", [{"text": "Poli", "start": 0.1, "end": 0.5}]
 
     with patch("app.assistant.router.synthesize_speech", side_effect=fake_synthesize):
         resp = client.post("/api/assistant/tts", json={"text": text})
@@ -161,6 +173,42 @@ def test_endpoint_tts_sukses_mengembalikan_audio_url_dan_engine(client):
         assert data["engine_used"] == "edge-tts"
         assert data["audio_url"].endswith(".mp3")
         assert "/static/tts/" in data["audio_url"]
+        assert data["words"] == [{"text": "Poli", "start": 0.1, "end": 0.5}]
+
+
+def test_endpoint_tts_words_kosong_saat_tier2(client):
+    """Kontrak Amandemen 033-B: sherpa-onnx mengembalikan words kosong, BUKAN error.
+    Klien memakai ini untuk memutuskan jatuh ke lip-sync tanpa timing."""
+
+    async def fake_synthesize(text, voice, output_dir):
+        file_base = get_audio_hash(text, voice)
+        target = output_dir / f"{file_base}.wav"
+        target.write_bytes(b"RIFFdummy")
+        return f"{file_base}.wav", "sherpa-onnx", []
+
+    with patch("app.assistant.router.synthesize_speech", side_effect=fake_synthesize):
+        resp = client.post("/api/assistant/tts", json={"text": "Tes offline"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["engine_used"] == "sherpa-onnx"
+        assert data["words"] == []
+
+
+def test_endpoint_tts_voice_kosong_memakai_default(client):
+    """voice tidak dikirim -> router WAJIB memakai DEFAULT_VOICE, bukan string kosong
+    atau None yang akan ditolak edge-tts."""
+    terpakai = {}
+
+    async def fake_synthesize(text, voice, output_dir):
+        terpakai["voice"] = voice
+        file_base = get_audio_hash(text, voice)
+        (output_dir / f"{file_base}.mp3").write_bytes(b"ID3dummy")
+        return f"{file_base}.mp3", "edge-tts", []
+
+    with patch("app.assistant.router.synthesize_speech", side_effect=fake_synthesize):
+        resp = client.post("/api/assistant/tts", json={"text": "Tanpa voice"})
+        assert resp.status_code == 200
+        assert terpakai["voice"] == DEFAULT_VOICE
 
 
 def test_endpoint_tts_503_saat_sintesis_gagal(client):
@@ -193,9 +241,19 @@ def test_static_audio_file_dapat_diunduh_via_get(client):
 async def test_live_edge_tts_synthesis(temp_tts_dir):
     # Pengujian langsung ke layanan Edge-TTS (Tier 1) untuk memastikan payload audio valid
     text = "Poli Anak di Lantai 2"
-    filename, engine = await synthesize_speech(text, voice="id-ID-GadisNeural", output_dir=temp_tts_dir)
+    filename, engine, words = await synthesize_speech(text, voice=DEFAULT_VOICE, output_dir=temp_tts_dir)
     assert engine == "edge-tts"
     assert filename.endswith(".mp3")
+
+    # Amandemen 033-B: batas kata WAJIB ikut keluar dari layanan sungguhan, bukan
+    # cuma dari mock. Kalau edge-tts berhenti mengirimkannya, tes inilah yang
+    # memberi tahu lebih dulu sebelum lip-sync di lapangan diam-diam rusak.
+    assert len(words) == 5, f"harusnya 5 kata, dapat {len(words)}: {words}"
+    assert [w["text"] for w in words] == ["Poli", "Anak", "di", "Lantai", "2"]
+    # Urut menaik dan tidak tumpang tindih.
+    for a, b in zip(words, words[1:]):
+        assert a["end"] <= b["start"], f"kata tumpang tindih: {a} lalu {b}"
+    assert words[0]["start"] >= 0
     audio_file = temp_tts_dir / filename
     assert audio_file.exists()
     assert audio_file.stat().st_size > 1000  # File MP3 asli memiliki ukuran valid (> 1 KB)
