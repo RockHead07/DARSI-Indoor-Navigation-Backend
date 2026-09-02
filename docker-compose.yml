@@ -45,6 +45,13 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
       TTS_BASE_URL: ${TTS_BASE_URL:-}
+      # Tier 2 TTS offline (ADR-033 Amandemen 033-C). Path ini dipastikan ada oleh
+      # Dockerfile SAAT BUILD (bukan volume terpisah) -- lihat catatan lisensi di sana.
+      # Lexicon dikosongkan sengaja: model Piper pakai frontend espeak-ng (data_dir),
+      # bukan kamus lexicon terpisah.
+      SHERPA_ONNX_VITS_MODEL: /app/models/vits-id/id_ID-news_tts-medium.onnx
+      SHERPA_ONNX_VITS_TOKENS: /app/models/vits-id/tokens.txt
+      SHERPA_ONNX_VITS_DATA_DIR: /app/models/vits-id/espeak-ng-data
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
