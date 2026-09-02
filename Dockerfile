@@ -8,8 +8,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # Install system dependencies needed for building packages / healthchecks
+# bzip2 WAJIB: python:3.11-slim tidak menyertakannya secara default, tapi model
+# TTS Tier 2 di bawah dikompres .tar.bz2 -- tanpa ini "tar xj" gagal exec bzip2.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    bzip2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install python dependencies
