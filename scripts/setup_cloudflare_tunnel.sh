@@ -39,12 +39,12 @@ read -p "Pilihan Anda (1/2): " choice
 case $choice in
     1)
         echo ""
-        echo "[3/4] Menjalankan Quick Tunnel ke http://localhost:8000..."
+        echo "[3/4] Menjalankan Quick Tunnel ke http://localhost:8050..."
         echo "Tunggu beberapa detik hingga URL *.trycloudflare.com muncul di layar."
         echo "Salin URL tersebut dan masukkan ke AssistantClient.cs di Unity."
         echo "Tekan Ctrl+C untuk menghentikan tunnel."
         echo "------------------------------------------------------"
-        cloudflared tunnel --url http://localhost:8000
+        cloudflared tunnel --url http://localhost:8050
         ;;
     2)
         echo ""

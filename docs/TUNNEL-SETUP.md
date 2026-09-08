@@ -26,7 +26,7 @@ POSTGRES_PASSWORD=darsi
 POSTGRES_DB=darsi
 DB_PORT=5433
 
-API_PORT=8000
+API_PORT=8050
 POI_SYNC_TOKEN=darsi-admin-token
 CORS_ORIGINS=*
 
@@ -64,7 +64,7 @@ Atau lakukan setup manual di bawah ini:
 ### Opsi A: Quick Tunnel (Pengujian Instan Tanpa Domain)
 Cocok untuk langsung menguji dari Unity/HP dalam 1 menit:
 ```bash
-cloudflared tunnel --url http://localhost:8000
+cloudflared tunnel --url http://localhost:8050
 ```
 Cloudflare akan menampilkan URL publik acak seperti:
 `https://random-subdomain-1234.trycloudflare.com`
@@ -84,7 +84,7 @@ Jika Anda memiliki akun Cloudflare (gratis) dan domain sendiri:
    * **Subdomain:** `api` (atau `darsi-api`)
    * **Domain:** domain Anda (contoh: `darsi.id` atau domain gratis)
    * **Type:** `HTTP`
-   * **URL:** `localhost:8000`
+   * **URL:** `localhost:8050`
 6. Klik **Save Tunnel**.
 
 Hasilnya, backend Anda sekarang memiliki URL HTTPS resmi permanen:

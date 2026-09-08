@@ -51,9 +51,10 @@ services:
       # bukan kamus lexicon terpisah.
       SHERPA_ONNX_VITS_MODEL: /app/models/vits-id/id_ID-news_tts-medium.onnx
       SHERPA_ONNX_VITS_TOKENS: /app/models/vits-id/tokens.txt
-      SHERPA_ONNX_VITS_DATA_DIR: /app/models/vits-id/espeak-ng-data
+    # Port host default 8050 (ADR-027 Amandemen 027-B) agar tidak bertabrakan
+    # dengan service backend lain di server host yang sama (misal DARSI-CS di port 8000).
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "${API_PORT:-8050}:8000"
     volumes:
       - fastembed_cache:/app/.fastembed_cache
       - tts_cache:/app/static/tts
